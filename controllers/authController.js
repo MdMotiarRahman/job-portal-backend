@@ -4,8 +4,13 @@ const User = require('../models/User');
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
+  const allowedRegistrationRoles = ['seeker', 'employer'];
 
   try {
+    if (!allowedRegistrationRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid registration role' });
+    }
+
     let user = await User.findOne({ email });
 
     if (user) {

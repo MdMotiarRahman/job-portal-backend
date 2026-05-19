@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  // Expect: Authorization: Bearer <token>
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Not authorized' });
   }
@@ -12,7 +11,6 @@ const authenticate = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // decoded: { user: { id, role } }
     req.user = decoded.user;
     next();
   } catch (err) {
@@ -20,4 +18,19 @@ const authenticate = (req, res, next) => {
   }
 };
 
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    return next();
+  };
+};
+
 module.exports = authenticate;
+module.exports.requireRole = requireRole;
