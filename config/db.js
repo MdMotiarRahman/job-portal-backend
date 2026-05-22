@@ -17,7 +17,22 @@ const connectDB = async () => {
 
     console.log('DB debug:', { isAtlas, mentionsLocalhost });
 
-    await mongoose.connect(mongoUri);
+    mongoose.connection.on('connected', () => {
+      console.log('MongoDB connection established');
+    });
+
+    mongoose.connection.on('error', (connectionError) => {
+      console.error('MongoDB runtime error:', connectionError?.message || connectionError);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('MongoDB disconnected');
+    });
+
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
+    });
     console.log('MongoDB connected');
   } catch (err) {
     console.error('Mongo connection error message:', err?.message);

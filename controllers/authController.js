@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SeekerProfile = require('../models/SeekerProfile');
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -28,6 +29,19 @@ exports.register = async (req, res) => {
     user.password = await bcrypt.hash(password, salt);
 
     await user.save();
+
+    if (user.role === 'seeker') {
+      await SeekerProfile.findOneAndUpdate(
+        { user: user._id },
+        {
+          $setOnInsert: {
+            user: user._id,
+            fullName: user.name || '',
+          },
+        },
+        { upsert: true }
+      );
+    }
 
     const payload = {
       user: {
