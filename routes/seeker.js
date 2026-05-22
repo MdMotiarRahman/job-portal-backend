@@ -16,7 +16,10 @@ router.get('/profile', authenticate, getMyProfile);
 router.put(
   '/profile',
   authenticate,
-  upload.single('profileImage'),
+  upload.fields([
+    { name: 'profileImage', maxCount: 1 },
+    { name: 'resume', maxCount: 1 },
+  ]),
   updateMyProfile
 );
 

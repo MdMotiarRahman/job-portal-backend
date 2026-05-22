@@ -2,11 +2,23 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const configureCloudinary = require('./config/cloudinary');
 
 const app = express();
 
 // Connect Database
 connectDB();
+
+const logCloudinaryStatus = () => {
+  try {
+    configureCloudinary();
+    console.log('Cloudinary connected');
+  } catch (error) {
+    console.log('Cloudinary not connected:', error.message);
+  }
+};
+
+logCloudinaryStatus();
 
 // Middleware
 app.use(cors());
