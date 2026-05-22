@@ -1,4 +1,12 @@
 {
+  "name": "job-portal-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "seed": "node seeders/userSeeder.js"
+  },
   "dependencies": {
     "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
@@ -8,6 +16,7 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",
+    "multer": "^1.4.5-lts.1",
     "react-router-dom": "^7.15.1",
     "react-scripts": "^5.0.1"
   },

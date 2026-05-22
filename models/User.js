@@ -16,7 +16,6 @@ const UserSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      // bcrypt hash will be stored here (no need to validate length at schema-level)
       minlength: 60,
     },
 
@@ -25,6 +24,17 @@ const UserSchema = new mongoose.Schema(
       enum: ['admin', 'employer', 'seeker'],
       required: true,
     },
+
+    phone: { type: String, default: '' },
+    skills: { type: String, default: '' },
+    education: { type: String, default: '' },
+    experience: { type: String, default: '' },
+    linkedin: { type: String, default: '' },
+    github: { type: String, default: '' },
+    bio: { type: String, default: '' },
+    location: { type: String, default: '' },
+    profileImage: { type: String, default: '' },
+    resume: { type: String, default: '' },
   },
   { timestamps: true }
 );
