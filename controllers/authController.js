@@ -75,11 +75,48 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    // Check if account is locked due to multiple failed attempts
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      return res.status(423).json({
+        message: 'Account temporarily locked due to multiple failed login attempts. Try again later.',
+      });
+    }
+
+    // Check if user is banned
+    if (user.isBanned) {
+      return res.status(403).json({
+        message: 'Your account has been banned',
+        reason: user.bannedReason,
+      });
+    }
+
+    // Check if user is active (except for admins)
+    if (!user.isActive && user.role !== 'admin') {
+      return res.status(403).json({
+        message: 'Your account is currently inactive. Please contact support.',
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
+      // Increment login attempts
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+
+      // Lock account after 5 failed attempts
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // Lock for 15 minutes
+      }
+
+      await user.save();
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
+    // Reset login attempts on successful login
+    user.loginAttempts = 0;
+    user.lockUntil = null;
+    user.lastLogin = new Date();
+    await user.save();
 
     const payload = {
       user: {
@@ -94,7 +131,15 @@ exports.login = async (req, res) => {
       { expiresIn: 3600 },
       (err, token) => {
         if (err) throw err;
-        res.json({ token });
+        res.json({
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        });
       }
     );
   } catch (err) {
@@ -108,15 +153,21 @@ exports.me = async (req, res) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Not authorized' });
 
-    const user = await User.findById(userId).select('name email role');
+    const user = await User.findById(userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.json({
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        isActive: user.isActive,
+        isBanned: user.isBanned,
+        isVerified: user.isVerified,
+        lastLogin: user.lastLogin,
+        phone: user.phone,
+        location: user.location,
       },
     });
   } catch (err) {
