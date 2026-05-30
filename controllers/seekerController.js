@@ -78,6 +78,14 @@ const syncEmployerJobStats = async (employerId) => {
   );
 };
 
+const getPublicJobVisibilityFilter = (jobId) => ({
+  _id: jobId,
+  status: 'active',
+  // Keep the seeker flow aligned with the public board:
+  // active jobs stay visible unless they were explicitly marked unapproved.
+  isApproved: { $ne: false },
+});
+
 const getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -246,11 +254,7 @@ const applyJob = async (req, res) => {
         return res.status(400).json({ message: 'Invalid job ID' });
       }
 
-      job = await Job.findOne({
-        _id: req.body.jobId,
-        status: 'active',
-        isApproved: true,
-      });
+      job = await Job.findOne(getPublicJobVisibilityFilter(req.body.jobId));
 
       if (!job) {
         return res.status(404).json({ message: 'Active approved job not found' });

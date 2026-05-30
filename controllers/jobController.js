@@ -5,7 +5,9 @@ const buildPublicJobFilter = (query) => {
   const { search, location, jobType, experienceLevel } = query;
   const filter = {
     status: 'active',
-    isApproved: true,
+    // Treat legacy active jobs without an approval flag as public,
+    // but keep explicitly pending/rejected jobs hidden.
+    isApproved: { $ne: false },
   };
 
   if (search) {
@@ -76,7 +78,7 @@ exports.getPublicJobById = async (req, res) => {
     const job = await Job.findOne({
       _id: jobId,
       status: 'active',
-      isApproved: true,
+      isApproved: { $ne: false },
     })
       .populate('company', 'name email')
       .select('-approvalNotes -approvedBy -applications');
