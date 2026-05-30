@@ -4,6 +4,145 @@ const JobApplication = require('../models/JobApplication');
 const SeekerProfile = require('../models/SeekerProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
+
+const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
+const experienceLevels = ['Entry', 'Mid', 'Senior'];
+const jobStatuses = ['active', 'inactive', 'closed'];
+
+const toArray = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const toNumberOrNull = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const buildJobPayload = (body, existingJob = null) => {
+  const payload = {};
+
+  if (body.title !== undefined) payload.title = String(body.title).trim();
+  if (body.description !== undefined) payload.description = String(body.description).trim();
+  if (body.company !== undefined) payload.company = body.company;
+  if (body.location !== undefined) payload.location = String(body.location).trim();
+  if (body.jobType !== undefined) payload.jobType = body.jobType;
+  if (body.experienceLevel !== undefined) payload.experienceLevel = body.experienceLevel;
+  if (body.status !== undefined) payload.status = body.status;
+  if (body.requirements !== undefined) payload.requirements = toArray(body.requirements);
+  if (body.skills !== undefined) payload.skills = toArray(body.skills);
+
+  if (
+    body.salaryMin !== undefined ||
+    body.salaryMax !== undefined ||
+    body.salaryCurrency !== undefined ||
+    body.salary !== undefined
+  ) {
+    const salary = body.salary || {};
+    payload.salary = {
+      min: toNumberOrNull(body.salaryMin ?? salary.min),
+      max: toNumberOrNull(body.salaryMax ?? salary.max),
+      currency: String(body.salaryCurrency ?? salary.currency ?? existingJob?.salary?.currency ?? 'USD').trim() || 'USD',
+    };
+  }
+
+  if (body.isApproved !== undefined) {
+    payload.isApproved = body.isApproved === true || body.isApproved === 'true';
+  }
+
+  if (body.approvalNotes !== undefined) {
+    payload.approvalNotes = String(body.approvalNotes).trim();
+  }
+
+  return payload;
+};
+
+const validateJobPayload = async (payload, { partial = false } = {}) => {
+  const requiredFields = ['title', 'description', 'company', 'location', 'jobType', 'experienceLevel', 'skills'];
+
+  if (!partial) {
+    const missingField = requiredFields.find((field) => {
+      if (field === 'skills') return !payload.skills || payload.skills.length === 0;
+      return !payload[field];
+    });
+
+    if (missingField) {
+      return `${missingField} is required`;
+    }
+  }
+
+  if (payload.company !== undefined) {
+    if (!mongoose.Types.ObjectId.isValid(payload.company)) {
+      return 'Valid employer is required';
+    }
+
+    const employer = await User.findOne({ _id: payload.company, role: 'employer' });
+    if (!employer) {
+      return 'Employer not found';
+    }
+  }
+
+  if (payload.jobType !== undefined && !jobTypes.includes(payload.jobType)) {
+    return 'Invalid job type';
+  }
+
+  if (payload.experienceLevel !== undefined && !experienceLevels.includes(payload.experienceLevel)) {
+    return 'Invalid experience level';
+  }
+
+  if (payload.status !== undefined && !jobStatuses.includes(payload.status)) {
+    return 'Invalid job status';
+  }
+
+  if (payload.skills !== undefined && payload.skills.length === 0) {
+    return 'At least one skill is required';
+  }
+
+  if (payload.salary) {
+    const { min, max } = payload.salary;
+    if (min !== null && min < 0) return 'Minimum salary cannot be negative';
+    if (max !== null && max < 0) return 'Maximum salary cannot be negative';
+    if (min !== null && max !== null && min > max) {
+      return 'Minimum salary cannot be greater than maximum salary';
+    }
+  }
+
+  return null;
+};
+
+const syncEmployerJobStats = async (employerId) => {
+  if (!employerId) return;
+
+  const jobs = await Job.find({ company: employerId }).select('applications');
+  const totalApplications = jobs.reduce(
+    (sum, job) => sum + (Array.isArray(job.applications) ? job.applications.length : 0),
+    0
+  );
+
+  await EmployerProfile.findOneAndUpdate(
+    { user: employerId },
+    {
+      totalJobs: jobs.length,
+      totalApplications,
+    },
+    { upsert: false }
+  );
+};
 
 // ============= ADMIN DASHBOARD STATS =============
 exports.getDashboardStats = async (req, res) => {
@@ -473,6 +612,113 @@ exports.getAllJobs = async (req, res) => {
   }
 };
 
+exports.getJobById = async (req, res) => {
+  try {
+    const jobId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({ message: 'Invalid job ID' });
+    }
+
+    const job = await Job.findById(jobId)
+      .populate('company', 'name email')
+      .populate('approvedBy', 'name email')
+      .populate('applications');
+
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    res.json({ job });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.createJob = async (req, res) => {
+  try {
+    const payload = buildJobPayload(req.body);
+    const validationError = await validateJobPayload(payload);
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    if (payload.isApproved) {
+      payload.approvedBy = req.user.id;
+    }
+
+    const job = await Job.create(payload);
+    await syncEmployerJobStats(job.company);
+
+    const populatedJob = await Job.findById(job._id)
+      .populate('company', 'name email')
+      .populate('approvedBy', 'name email');
+
+    res.status(201).json({
+      message: 'Job created successfully',
+      job: populatedJob,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.updateJob = async (req, res) => {
+  try {
+    const jobId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({ message: 'Invalid job ID' });
+    }
+
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    const oldEmployerId = job.company?.toString();
+    const payload = buildJobPayload(req.body, job);
+    const validationError = await validateJobPayload(payload, { partial: true });
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    Object.assign(job, payload);
+
+    if (payload.isApproved === true && !job.approvedBy) {
+      job.approvedBy = req.user.id;
+    }
+
+    if (payload.isApproved === false) {
+      job.approvedBy = null;
+    }
+
+    await job.save();
+
+    const newEmployerId = job.company?.toString();
+    await syncEmployerJobStats(newEmployerId);
+    if (oldEmployerId && oldEmployerId !== newEmployerId) {
+      await syncEmployerJobStats(oldEmployerId);
+    }
+
+    const populatedJob = await Job.findById(job._id)
+      .populate('company', 'name email')
+      .populate('approvedBy', 'name email');
+
+    res.json({
+      message: 'Job updated successfully',
+      job: populatedJob,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 exports.approveJob = async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -482,6 +728,7 @@ exports.approveJob = async (req, res) => {
       jobId,
       {
         isApproved: true,
+        status: 'active',
         approvedBy: req.user.id,
         approvalNotes: notes || '',
       },
@@ -561,6 +808,58 @@ exports.closeJob = async (req, res) => {
   }
 };
 
+exports.reopenJob = async (req, res) => {
+  try {
+    const jobId = req.params.id;
+
+    const job = await Job.findByIdAndUpdate(
+      jobId,
+      {
+        status: 'active',
+      },
+      { new: true }
+    );
+
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    res.json({
+      message: 'Job reopened successfully',
+      job,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.deleteJob = async (req, res) => {
+  try {
+    const jobId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({ message: 'Invalid job ID' });
+    }
+
+    const job = await Job.findByIdAndDelete(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    if (job.applications?.length) {
+      await JobApplication.deleteMany({ _id: { $in: job.applications } });
+    }
+
+    await syncEmployerJobStats(job.company);
+
+    res.json({ message: 'Job deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 // ============= JOB APPLICATION MANAGEMENT =============
 exports.getAllApplications = async (req, res) => {
   try {
@@ -572,6 +871,7 @@ exports.getAllApplications = async (req, res) => {
 
     const applications = await JobApplication.find(filter)
       .populate('seeker', 'name email')
+      .populate('job', 'title company location status isApproved')
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });

@@ -7,6 +7,12 @@ const JobApplicationSchema = new mongoose.Schema(
       ref: 'User',
     },
 
+    job: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Job',
+      default: null,
+    },
+
     jobTitle: String,
 
     coverLetter: String,

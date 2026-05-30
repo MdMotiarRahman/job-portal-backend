@@ -2,7 +2,10 @@ const fs = require('fs');
 const User = require('../models/User');
 const SeekerProfile = require('../models/SeekerProfile');
 const JobApplication = require('../models/JobApplication');
+const Job = require('../models/Job');
+const EmployerProfile = require('../models/EmployerProfile');
 const configureCloudinary = require('../config/cloudinary');
+const mongoose = require('mongoose');
 
 let cloudinaryClient;
 
@@ -54,6 +57,25 @@ const getFirstFile = (files, fieldName) => {
   }
 
   return files[fieldName][0];
+};
+
+const syncEmployerJobStats = async (employerId) => {
+  if (!employerId) return;
+
+  const jobs = await Job.find({ company: employerId }).select('applications');
+  const totalApplications = jobs.reduce(
+    (sum, job) => sum + (Array.isArray(job.applications) ? job.applications.length : 0),
+    0
+  );
+
+  await EmployerProfile.findOneAndUpdate(
+    { user: employerId },
+    {
+      totalJobs: jobs.length,
+      totalApplications,
+    },
+    { upsert: false }
+  );
 };
 
 const getMyProfile = async (req, res) => {
@@ -217,6 +239,23 @@ const applyJob = async (req, res) => {
   try {
     const resumeFile = req.file || getFirstFile(req.files, 'resume');
     let resumeUrl = '';
+    let job = null;
+
+    if (req.body.jobId) {
+      if (!mongoose.Types.ObjectId.isValid(req.body.jobId)) {
+        return res.status(400).json({ message: 'Invalid job ID' });
+      }
+
+      job = await Job.findOne({
+        _id: req.body.jobId,
+        status: 'active',
+        isApproved: true,
+      });
+
+      if (!job) {
+        return res.status(404).json({ message: 'Active approved job not found' });
+      }
+    }
 
     if (resumeFile) {
       const resumeMeta = await uploadToCloudinary(resumeFile, {
@@ -228,12 +267,19 @@ const applyJob = async (req, res) => {
 
     const application = new JobApplication({
       seeker: req.user.id,
-      jobTitle: req.body.jobTitle,
+      job: job?._id || null,
+      jobTitle: job?.title || req.body.jobTitle,
       coverLetter: req.body.coverLetter,
       resume: resumeUrl,
     });
 
     await application.save();
+
+    if (job) {
+      job.applications.addToSet(application._id);
+      await job.save();
+      await syncEmployerJobStats(job.company);
+    }
 
     res.status(201).json({
       message: 'Application submitted successfully',
@@ -250,7 +296,9 @@ const getMyApplications = async (req, res) => {
   try {
     const applications = await JobApplication.find({
       seeker: req.user.id,
-    }).sort({ createdAt: -1 });
+    })
+      .populate('job', 'title company location status isApproved')
+      .sort({ createdAt: -1 });
 
     res.json(applications);
   } catch (error) {

@@ -19,9 +19,14 @@ const {
   verifyUser,
   // Job Management
   getAllJobs,
+  getJobById,
+  createJob,
+  updateJob,
   approveJob,
   rejectJob,
   closeJob,
+  reopenJob,
+  deleteJob,
   // Job Applications
   getAllApplications,
   updateApplicationStatus,
@@ -106,6 +111,21 @@ router.put('/users/:id/verify', verifyUser);
 // @access  Private (Admin only)
 router.get('/jobs', getAllJobs);
 
+// @route   GET /api/admin/jobs/:id
+// @desc    Get job by ID
+// @access  Private (Admin only)
+router.get('/jobs/:id', getJobById);
+
+// @route   POST /api/admin/jobs
+// @desc    Create a job posting
+// @access  Private (Admin only)
+router.post('/jobs', createJob);
+
+// @route   PUT /api/admin/jobs/:id
+// @desc    Update a job posting
+// @access  Private (Admin only)
+router.put('/jobs/:id', updateJob);
+
 // @route   PUT /api/admin/jobs/:id/approve
 // @desc    Approve a job posting
 // @access  Private (Admin only)
@@ -120,6 +140,16 @@ router.put('/jobs/:id/reject', rejectJob);
 // @desc    Close a job posting
 // @access  Private (Admin only)
 router.put('/jobs/:id/close', closeJob);
+
+// @route   PUT /api/admin/jobs/:id/reopen
+// @desc    Reopen a closed job posting
+// @access  Private (Admin only)
+router.put('/jobs/:id/reopen', reopenJob);
+
+// @route   DELETE /api/admin/jobs/:id
+// @desc    Delete a job posting
+// @access  Private (Admin only)
+router.delete('/jobs/:id', deleteJob);
 
 // ============ JOB APPLICATIONS ============
 // @route   GET /api/admin/applications
