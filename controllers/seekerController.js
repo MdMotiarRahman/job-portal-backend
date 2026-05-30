@@ -259,6 +259,15 @@ const applyJob = async (req, res) => {
       if (!job) {
         return res.status(404).json({ message: 'Active approved job not found' });
       }
+
+      const existingApplication = await JobApplication.findOne({
+        seeker: req.user.id,
+        job: job._id,
+      });
+
+      if (existingApplication) {
+        return res.status(400).json({ message: 'You have already applied to this job' });
+      }
     }
 
     if (resumeFile) {
@@ -287,6 +296,7 @@ const applyJob = async (req, res) => {
 
     res.status(201).json({
       message: 'Application submitted successfully',
+      application,
     });
   } catch (error) {
     console.log(error);

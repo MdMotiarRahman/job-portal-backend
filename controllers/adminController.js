@@ -863,15 +863,29 @@ exports.deleteJob = async (req, res) => {
 // ============= JOB APPLICATION MANAGEMENT =============
 exports.getAllApplications = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, search, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
     let filter = {};
     if (status) filter.status = status;
 
+    if (search) {
+      filter.$or = [
+        { jobTitle: { $regex: search, $options: 'i' } },
+        { coverLetter: { $regex: search, $options: 'i' } },
+      ];
+    }
+
     const applications = await JobApplication.find(filter)
       .populate('seeker', 'name email')
-      .populate('job', 'title company location status isApproved')
+      .populate({
+        path: 'job',
+        select: 'title company location status isApproved',
+        populate: {
+          path: 'company',
+          select: 'name email',
+        },
+      })
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
@@ -906,7 +920,16 @@ exports.updateApplicationStatus = async (req, res) => {
       appId,
       { status },
       { new: true }
-    );
+    )
+      .populate('seeker', 'name email')
+      .populate({
+        path: 'job',
+        select: 'title company location status isApproved',
+        populate: {
+          path: 'company',
+          select: 'name email',
+        },
+      });
 
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
