@@ -34,6 +34,7 @@ app.get('/', (req, res) => res.send('API Running'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/jobs', require('./routes/jobs'));
 app.use('/api/seeker', require('./routes/seeker'));
+app.use('/api/employer', require('./routes/employer'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Multer / server error handler

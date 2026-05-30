@@ -23,6 +23,26 @@ const JobApplicationSchema = new mongoose.Schema(
       type: String,
       default: 'Pending',
     },
+
+    interviewDate: {
+      type: String,
+      default: '',
+    },
+
+    interviewTime: {
+      type: String,
+      default: '',
+    },
+
+    interviewMode: {
+      type: String,
+      default: '',
+    },
+
+    employerMessage: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,
