@@ -67,6 +67,13 @@ const EmployerProfileSchema = new mongoose.Schema(
       default: false,
     },
 
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+      index: true,
+    },
+
     verificationDocument: {
       type: mediaSchema,
       default: () => ({}),
@@ -75,6 +82,27 @@ const EmployerProfileSchema = new mongoose.Schema(
     verifiedAt: {
       type: Date,
       default: null,
+    },
+
+    rejectionReason: {
+      type: String,
+      default: '',
+    },
+
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    adminNotes: {
+      type: String,
+      default: '',
     },
 
     totalJobs: {

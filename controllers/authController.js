@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const SeekerProfile = require('../models/SeekerProfile');
+const EmployerProfile = require('../models/EmployerProfile');
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -41,6 +42,19 @@ exports.register = async (req, res) => {
         },
         { upsert: true }
       );
+    } else if (user.role === 'employer') {
+      // Create employer profile with pending verification status
+      await EmployerProfile.findOneAndUpdate(
+        { user: user._id },
+        {
+          $setOnInsert: {
+            user: user._id,
+            companyName: '',
+            verificationStatus: 'pending',
+          },
+        },
+        { upsert: true }
+      );
     }
 
     const payload = {
@@ -48,6 +62,7 @@ exports.register = async (req, res) => {
         id: user.id,
         role: user.role,
       },
+      role: user.role,
     };
 
     jwt.sign(
@@ -123,15 +138,18 @@ exports.login = async (req, res) => {
         id: user.id,
         role: user.role,
       },
+      role: user.role,
     };
 
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
       { expiresIn: 3600 },
-      (err, token) => {
+      async (err, token) => {
         if (err) throw err;
-        res.json({
+
+        // Prepare response data
+        const responseData = {
           token,
           user: {
             id: user.id,
@@ -139,7 +157,18 @@ exports.login = async (req, res) => {
             email: user.email,
             role: user.role,
           },
-        });
+        };
+
+        // For employers, include verification status
+        if (user.role === 'employer') {
+          const employerProfile = await EmployerProfile.findOne({ user: user._id });
+          if (employerProfile) {
+            responseData.verificationStatus = employerProfile.verificationStatus;
+            responseData.rejectionReason = employerProfile.rejectionReason;
+          }
+        }
+
+        res.json(responseData);
       }
     );
   } catch (err) {

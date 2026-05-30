@@ -1073,3 +1073,187 @@ exports.getAnalytics = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// ============= EMPLOYER VERIFICATION MANAGEMENT =============
+exports.getAllEmployers = async (req, res) => {
+  try {
+    const { verificationStatus, search, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    let filter = { role: 'employer' };
+
+    if (verificationStatus && ['pending', 'approved', 'rejected'].includes(verificationStatus)) {
+      filter['employer.verificationStatus'] = verificationStatus;
+    }
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const employers = await User.find(filter)
+      .select('-password')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    // Get employer profiles for each user
+    const employerIds = employers.map(e => e._id);
+    const employerProfiles = await EmployerProfile.find({ user: { $in: employerIds } });
+
+    const employerProfileMap = new Map(employerProfiles.map(ep => [ep.user.toString(), ep]));
+
+    const enrichedEmployers = employers.map(emp => ({
+      user: emp,
+      profile: employerProfileMap.get(emp._id.toString()),
+    }));
+
+    const total = await User.countDocuments(filter);
+
+    res.json({
+      employers: enrichedEmployers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.getEmployerById = async (req, res) => {
+  try {
+    const employerId = req.params.id;
+
+    const user = await User.findById(employerId).select('-password');
+    if (!user || user.role !== 'employer') {
+      return res.status(404).json({ message: 'Employer not found' });
+    }
+
+    const profile = await EmployerProfile.findOne({ user: employerId })
+      .populate('user', '-password')
+      .populate('reviewedBy', 'name email');
+
+    res.json({
+      user,
+      profile,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.approveEmployer = async (req, res) => {
+  try {
+    const employerId = req.params.id;
+    const { adminNotes } = req.body;
+
+    // Check if user exists and is an employer
+    const user = await User.findById(employerId);
+    if (!user || user.role !== 'employer') {
+      return res.status(404).json({ message: 'Employer not found' });
+    }
+
+    // Update employer profile
+    const profile = await EmployerProfile.findOneAndUpdate(
+      { user: employerId },
+      {
+        verificationStatus: 'approved',
+        isVerified: true,
+        verifiedAt: new Date(),
+        reviewedAt: new Date(),
+        reviewedBy: req.user.id,
+        adminNotes: adminNotes || '',
+        rejectionReason: '',
+      },
+      { new: true }
+    ).populate('reviewedBy', 'name email');
+
+    // Also update user's isVerified flag
+    user.isVerified = true;
+    user.verifiedAt = new Date();
+    user.updatedBy = req.user.id;
+    await user.save();
+
+    res.json({
+      message: 'Employer approved successfully',
+      profile,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.rejectEmployer = async (req, res) => {
+  try {
+    const employerId = req.params.id;
+    const { rejectionReason, adminNotes } = req.body;
+
+    if (!rejectionReason) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
+    // Check if user exists and is an employer
+    const user = await User.findById(employerId);
+    if (!user || user.role !== 'employer') {
+      return res.status(404).json({ message: 'Employer not found' });
+    }
+
+    // Update employer profile
+    const profile = await EmployerProfile.findOneAndUpdate(
+      { user: employerId },
+      {
+        verificationStatus: 'rejected',
+        isVerified: false,
+        verifiedAt: null,
+        reviewedAt: new Date(),
+        reviewedBy: req.user.id,
+        rejectionReason,
+        adminNotes: adminNotes || '',
+      },
+      { new: true }
+    ).populate('reviewedBy', 'name email');
+
+    res.json({
+      message: 'Employer rejected successfully',
+      profile,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.getPendingEmployers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const employers = await EmployerProfile.find({ verificationStatus: 'pending' })
+      .populate('user', '-password')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    const total = await EmployerProfile.countDocuments({ verificationStatus: 'pending' });
+
+    res.json({
+      employers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};

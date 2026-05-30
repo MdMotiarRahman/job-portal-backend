@@ -31,8 +31,11 @@ const {
   getAllApplications,
   updateApplicationStatus,
   // Employer Verification
-  verifyEmployer,
-  rejectEmployerVerification,
+  getAllEmployers,
+  getEmployerById,
+  approveEmployer,
+  rejectEmployer,
+  getPendingEmployers,
   // Analytics
   getAnalytics,
 } = require('../controllers/adminController');
@@ -163,14 +166,29 @@ router.get('/applications', getAllApplications);
 router.put('/applications/:id/status', updateApplicationStatus);
 
 // ============ EMPLOYER VERIFICATION ============
-// @route   PUT /api/admin/employers/:id/verify
-// @desc    Verify employer profile
+// @route   GET /api/admin/employers
+// @desc    Get all employers with verification status
 // @access  Private (Admin only)
-router.put('/employers/:id/verify', verifyEmployer);
+router.get('/employers', getAllEmployers);
 
-// @route   PUT /api/admin/employers/:id/reject-verification
+// @route   GET /api/admin/employers/pending
+// @desc    Get pending employers for verification
+// @access  Private (Admin only)
+router.get('/employers/pending', getPendingEmployers);
+
+// @route   GET /api/admin/employers/:id
+// @desc    Get employer details
+// @access  Private (Admin only)
+router.get('/employers/:id', getEmployerById);
+
+// @route   PUT /api/admin/employers/:id/approve
+// @desc    Approve employer verification
+// @access  Private (Admin only)
+router.put('/employers/:id/approve', approveEmployer);
+
+// @route   PUT /api/admin/employers/:id/reject
 // @desc    Reject employer verification
 // @access  Private (Admin only)
-router.put('/employers/:id/reject-verification', rejectEmployerVerification);
+router.put('/employers/:id/reject', rejectEmployer);
 
 module.exports = router;
