@@ -49,7 +49,7 @@ exports.register = async (req, res) => {
         {
           $setOnInsert: {
             user: user._id,
-            companyName: '',
+            companyName: user.name || user.email,
             verificationStatus: 'pending',
           },
         },

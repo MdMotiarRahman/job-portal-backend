@@ -1075,16 +1075,47 @@ exports.getAnalytics = async (req, res) => {
 };
 
 // ============= EMPLOYER VERIFICATION MANAGEMENT =============
+const ensureEmployerProfiles = async (users) => {
+  const employerUsers = users.filter((user) => user.role === 'employer');
+  if (employerUsers.length === 0) return new Map();
+
+  const userIds = employerUsers.map((user) => user._id);
+  let profiles = await EmployerProfile.find({ user: { $in: userIds } });
+  const profileMap = new Map(profiles.map((profile) => [profile.user.toString(), profile]));
+
+  const missingUsers = employerUsers.filter((user) => !profileMap.has(user._id.toString()));
+
+  if (missingUsers.length > 0) {
+    await Promise.all(
+      missingUsers.map((user) =>
+        EmployerProfile.findOneAndUpdate(
+          { user: user._id },
+          {
+            $setOnInsert: {
+              user: user._id,
+              companyName: user.name || user.email || 'Employer',
+              verificationStatus: 'pending',
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      )
+    );
+
+    profiles = await EmployerProfile.find({ user: { $in: userIds } });
+  }
+
+  return new Map(profiles.map((profile) => [profile.user.toString(), profile]));
+};
+
 exports.getAllEmployers = async (req, res) => {
   try {
     const { verificationStatus, search, page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const currentPage = Math.max(parseInt(page), 1);
+    const perPage = Math.max(parseInt(limit), 1);
+    const skip = (currentPage - 1) * perPage;
 
-    let filter = { role: 'employer' };
-
-    if (verificationStatus && ['pending', 'approved', 'rejected'].includes(verificationStatus)) {
-      filter['employer.verificationStatus'] = verificationStatus;
-    }
+    const filter = { role: 'employer' };
 
     if (search) {
       filter.$or = [
@@ -1095,29 +1126,32 @@ exports.getAllEmployers = async (req, res) => {
 
     const employers = await User.find(filter)
       .select('-password')
-      .skip(skip)
-      .limit(parseInt(limit))
       .sort({ createdAt: -1 });
 
-    // Get employer profiles for each user
-    const employerIds = employers.map(e => e._id);
-    const employerProfiles = await EmployerProfile.find({ user: { $in: employerIds } });
+    const employerProfileMap = await ensureEmployerProfiles(employers);
 
-    const employerProfileMap = new Map(employerProfiles.map(ep => [ep.user.toString(), ep]));
+    const enrichedEmployers = employers
+      .map((employer) => ({
+        user: employer,
+        profile: employerProfileMap.get(employer._id.toString()),
+      }))
+      .filter((employer) => {
+        if (!verificationStatus || !['pending', 'approved', 'rejected'].includes(verificationStatus)) {
+          return true;
+        }
 
-    const enrichedEmployers = employers.map(emp => ({
-      user: emp,
-      profile: employerProfileMap.get(emp._id.toString()),
-    }));
+        return employer.profile?.verificationStatus === verificationStatus;
+      });
 
-    const total = await User.countDocuments(filter);
+    const paginatedEmployers = enrichedEmployers.slice(skip, skip + perPage);
+    const total = enrichedEmployers.length;
 
     res.json({
-      employers: enrichedEmployers,
+      employers: paginatedEmployers,
       pagination: {
         total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
+        page: currentPage,
+        pages: Math.max(Math.ceil(total / perPage), 1),
       },
     });
   } catch (err) {
@@ -1234,22 +1268,31 @@ exports.rejectEmployer = async (req, res) => {
 exports.getPendingEmployers = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const currentPage = Math.max(parseInt(page), 1);
+    const perPage = Math.max(parseInt(limit), 1);
+    const skip = (currentPage - 1) * perPage;
 
-    const employers = await EmployerProfile.find({ verificationStatus: 'pending' })
-      .populate('user', '-password')
-      .skip(skip)
-      .limit(parseInt(limit))
+    const employers = await User.find({ role: 'employer' })
+      .select('-password')
       .sort({ createdAt: -1 });
 
-    const total = await EmployerProfile.countDocuments({ verificationStatus: 'pending' });
+    const employerProfileMap = await ensureEmployerProfiles(employers);
+    const pendingEmployers = employers
+      .map((employer) => ({
+        user: employer,
+        profile: employerProfileMap.get(employer._id.toString()),
+      }))
+      .filter((employer) => employer.profile?.verificationStatus === 'pending');
+
+    const paginatedEmployers = pendingEmployers.slice(skip, skip + perPage);
+    const total = pendingEmployers.length;
 
     res.json({
-      employers,
+      employers: paginatedEmployers,
       pagination: {
         total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
+        page: currentPage,
+        pages: Math.max(Math.ceil(total / perPage), 1),
       },
     });
   } catch (err) {
