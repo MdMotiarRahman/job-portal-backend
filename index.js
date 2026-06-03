@@ -3,6 +3,8 @@ const path = require('path');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const configureCloudinary = require('./config/cloudinary');
+const emailConfig = require('./config/email');
+const { initializeReminderSchedules } = require('./utils/reminderService');
 
 const app = express();
 
@@ -20,6 +22,20 @@ const logCloudinaryStatus = () => {
 
 logCloudinaryStatus();
 
+// Test Email Configuration
+const testEmailConfig = async () => {
+  try {
+    await emailConfig.testEmailConfig();
+  } catch (error) {
+    console.log('Email service setup skipped (optional)');
+  }
+};
+
+testEmailConfig();
+
+// Initialize Reminder Schedules (Cron jobs)
+initializeReminderSchedules();
+
 // Middleware
 app.use(cors());
 app.use(express.json({ extended: false }));
@@ -33,6 +49,7 @@ app.get('/', (req, res) => res.send('API Running'));
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/jobs', require('./routes/jobs'));
+app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/seeker', require('./routes/seeker'));
 app.use('/api/employer', require('./routes/employer'));
 app.use('/api/admin', require('./routes/admin'));

@@ -81,6 +81,19 @@ const JobSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+
+    expiryDate: {
+      type: Date,
+      required: false,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      index: true,
+    },
+
+    applicationDeadline: {
+      type: Date,
+      required: false,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    },
   },
   { timestamps: true }
 );

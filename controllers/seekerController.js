@@ -6,6 +6,7 @@ const Job = require('../models/Job');
 const EmployerProfile = require('../models/EmployerProfile');
 const configureCloudinary = require('../config/cloudinary');
 const mongoose = require('mongoose');
+const { createNewApplicationReminder } = require('../utils/reminderService');
 
 let cloudinaryClient;
 
@@ -292,6 +293,27 @@ const applyJob = async (req, res) => {
       job.applications.addToSet(application._id);
       await job.save();
       await syncEmployerJobStats(job.company);
+
+      // ========== 🎯 REMINDER INTEGRATION ==========
+      // Create reminder for employer - notify about new application
+      const employer = await User.findById(job.company).select('name email');
+      const seeker = await User.findById(req.user.id).select('name email');
+
+      if (employer) {
+        await createNewApplicationReminder(job.company, {
+          applicationId: application._id,
+          jobId: job._id,
+          employerName: employer.name,
+          jobTitle: job.title,
+          applicantName: seeker.name,
+          applicantEmail: seeker.email,
+        });
+
+        console.log(
+          `📧 New application reminder queued for employer: ${employer.name}`
+        );
+      }
+      // ===============================================
     }
 
     res.status(201).json({

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const SeekerProfile = require('../models/SeekerProfile');
 const EmployerProfile = require('../models/EmployerProfile');
+const { createEmployerVerificationReminder } = require('../utils/reminderService');
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -55,6 +56,26 @@ exports.register = async (req, res) => {
         },
         { upsert: true }
       );
+
+      // ========== 🎯 REMINDER INTEGRATION ==========
+      // Create reminder for admin - notify about pending employer verification
+      const admins = await User.find({ role: 'admin' });
+
+      if (admins && admins.length > 0) {
+        for (const admin of admins) {
+          await createEmployerVerificationReminder(admin._id, {
+            employerId: user._id,
+            companyName: user.name || 'New Company',
+            contactName: user.name,
+            email: user.email,
+          });
+        }
+
+        console.log(
+          `📧 Employer verification reminders queued for ${admins.length} admin(s)`
+        );
+      }
+      // ===============================================
     }
 
     const payload = {

@@ -3,6 +3,7 @@ const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
 const JobApplication = require('../models/JobApplication');
 const User = require('../models/User');
+const { createJobExpiringReminder } = require('../utils/reminderService');
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 const experienceLevels = ['Entry', 'Mid', 'Senior'];
@@ -225,6 +226,20 @@ exports.createJob = async (req, res) => {
     await syncEmployerStats(req.user.id);
 
     const populatedJob = await Job.findById(job._id).populate('company', 'name email');
+
+    // ========== 🎯 REMINDER INTEGRATION ==========
+    // Create reminder for employer - notify when job posting is expiring
+    await createJobExpiringReminder(req.user.id, {
+      jobId: job._id,
+      employerName: user.name,
+      jobTitle: job.title,
+      expiryDate: job.expiryDate,
+      totalApplications: 0,
+      pendingApplications: 0,
+    });
+
+    console.log(`📧 Job expiry reminder queued for job: ${job.title}`);
+    // ===============================================
 
     res.status(201).json({
       message: 'Job created successfully and submitted for admin approval.',

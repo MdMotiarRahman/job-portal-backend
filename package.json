@@ -18,6 +18,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",
     "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.10",
     "react-router-dom": "^7.15.1",
     "react-scripts": "^5.0.1"
   },
