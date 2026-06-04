@@ -9,15 +9,43 @@ const cron = require('node-cron');
 const webpush = require('web-push');
 
 const vapidKeys = {
-  publicKey: process.env.VAPID_PUBLIC_KEY || 'YOUR_PUBLIC_VAPID_KEY',
-  privateKey: process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_VAPID_KEY'
+  publicKey: process.env.VAPID_PUBLIC_KEY,
+  privateKey: process.env.VAPID_PRIVATE_KEY,
 };
 
-webpush.setVapidDetails(
-  'mailto:support@jobportal.com',
-  vapidKeys.publicKey,
-  vapidKeys.privateKey
-);
+const isProbablyValidVapidKey = (key) => {
+  if (!key) return false;
+
+  // web-push expects URL-safe base64. Placeholder strings should be rejected.
+  const trimmed = String(key).trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.includes('YOUR_PUBLIC_VAPID_KEY') ||
+    trimmed.includes('YOUR_PRIVATE_VAPID_KEY')
+  ) {
+    return false;
+  }
+
+  // For base64url keys, 65-byte public keys encode to ~87 chars.
+  // We use a len check as a fast pre-validation to avoid startup crashes.
+  return trimmed.length >= 80 && trimmed.length <= 120;
+};
+
+const canUseWebPush =
+  isProbablyValidVapidKey(vapidKeys.publicKey) &&
+  isProbablyValidVapidKey(vapidKeys.privateKey);
+
+if (canUseWebPush) {
+  webpush.setVapidDetails(
+    'mailto:support@jobportal.com',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+} else {
+  console.warn(
+    '⚠️ WebPush/VAPID not configured or invalid. Push notifications will be disabled until VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are set correctly.'
+  );
+}
 
 const sendPushNotification = async (user, payload) => {
   if (!user || !user.pushSubscriptions || user.pushSubscriptions.length === 0) return;

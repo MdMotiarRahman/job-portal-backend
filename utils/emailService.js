@@ -100,7 +100,7 @@ const getEmailFooter = (preferencesUrl) => `
 `;
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const preferencesUrl = \`\${FRONTEND_URL}/email-preferences\`;
+const preferencesUrl = `${FRONTEND_URL}/email-preferences`;
 
 /**
  * Template: New Job Application
