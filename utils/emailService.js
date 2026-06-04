@@ -74,7 +74,29 @@ const getEmailTemplate = (template, data) => {
     reminderVerificationPending: reminderVerificationPendingTemplate(data),
   };
 
-  return templates[template] || defaultTemplate(data);
+  const html = templates[template] || defaultTemplate(data);
+
+  // Fix legacy escaped template-literal calls inside the email templates.
+  // Some templates contain literal sequences like: \${getEmailFooter(preferencesUrl)}
+  // Replace them so the resulting HTML includes real header/footer markup.
+  const rendered = String(html)
+    // Previously-escaped legacy sequences
+    .replace(/\\\$\{getEmailHeader\(\)\}/g, getEmailHeader())
+    .replace(/\\\$\{getEmailHeader\(([^)]*)\)\}/g, (m, colorExpr) => {
+      const cleaned = String(colorExpr).trim().replace(/^['"`]|['"`]$/g, '');
+      return getEmailHeader(cleaned || undefined);
+    })
+    .replace(
+      /\\\$\{getEmailFooter\(preferencesUrl\)\}/g,
+      getEmailFooter(preferencesUrl)
+    )
+    // If escaping is already “lost” and the literal ${...} appears in output,
+    // replace the literal strings directly too.
+    .replace('${getEmailFooter(preferencesUrl)}', getEmailFooter(preferencesUrl))
+    .replace('${getEmailHeader()}', getEmailHeader())
+    .replace('${getEmailHeader(preferencesUrl)}', getEmailHeader());
+
+  return rendered;
 };
 
 // ============================================
@@ -115,7 +137,8 @@ const reminderNewApplicationTemplate = (data) => `
   </head>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 0 auto; background: white;">
-      \${getEmailHeader()}
+      ${getEmailHeader()}
+      
       
       <div style="padding: 24px;">
         <h2 style="color: #333; margin-top: 0;">📝 New Application Received</h2>
@@ -142,7 +165,7 @@ const reminderNewApplicationTemplate = (data) => `
         </a>
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -192,7 +215,7 @@ const reminderInterviewScheduledTemplate = (data) => `
         </a>
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -230,7 +253,7 @@ const reminderApplicationStatusUpdateTemplate = (data) => `
         \${data.message ? \`<p style="color: #666;"><strong>Message from Employer:</strong><br/>\${data.message}</p>\` : ''}
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -249,7 +272,8 @@ const reminderJobDeadlineTemplate = (data) => `
   </head>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 0 auto; background: white;">
-      \${getEmailHeader('#ef4444')}
+      ${getEmailHeader('#ef4444')}
+      
       
       <div style="padding: 24px;">
         <h2 style="color: #333; margin-top: 0;">⏰ Application Deadline Approaching</h2>
@@ -279,7 +303,7 @@ const reminderJobDeadlineTemplate = (data) => `
         </a>
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -298,7 +322,8 @@ const reminderJobExpiringTemplate = (data) => `
   </head>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 0 auto; background: white;">
-      \${getEmailHeader('#f59e0b')}
+      ${getEmailHeader('#f59e0b')}
+      
       
       <div style="padding: 24px;">
         <h2 style="color: #333; margin-top: 0;">📢 Job Posting Expiring Soon</h2>
@@ -327,7 +352,7 @@ const reminderJobExpiringTemplate = (data) => `
         </a>
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -375,7 +400,7 @@ const reminderPendingApplicationsTemplate = (data) => `
         </a>
       </div>
       
-      \${getEmailFooter(preferencesUrl)}
+      ${getEmailFooter(preferencesUrl)}
     </div>
   </body>
   </html>
@@ -394,7 +419,8 @@ const reminderVerificationPendingTemplate = (data) => `
   </head>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
     <div style="max-width: 600px; margin: 0 auto; background: white;">
-      \${getEmailHeader('#8b5cf6')}
+      ${getEmailHeader('#8b5cf6')}
+      
       
       <div style="padding: 24px;">
         <h2 style="color: #333; margin-top: 0;">👤 Employer Verification Pending</h2>
@@ -458,4 +484,5 @@ const defaultTemplate = (data) => `
 module.exports = {
   sendEmail,
   getEmailSubject,
+  getEmailTemplate,
 };

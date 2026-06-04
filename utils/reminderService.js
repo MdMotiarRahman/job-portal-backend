@@ -548,6 +548,12 @@ const sendWeeklyDigest = async () => {
  * Call this in your main app.js or index.js
  */
 const initializeReminderSchedules = () => {
+  // Avoid starting background cron jobs during Jest/tests or when explicitly disabled.
+  if (process.env.NODE_ENV === 'test' || process.env.DISABLE_REMINDER_SCHEDULES === 'true') {
+    console.log('⏰ Reminder schedules not initialized (test environment / disabled).');
+    return;
+  }
+
   console.log('⏰ Initializing reminder schedules...');
 
   // Send pending reminders every hour
