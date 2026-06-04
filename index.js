@@ -53,6 +53,7 @@ app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/seeker', require('./routes/seeker'));
 app.use('/api/employer', require('./routes/employer'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/email-preferences', require('./routes/emailPreferences'));
 
 // Multer / server error handler
 app.use((err, req, res, next) => {

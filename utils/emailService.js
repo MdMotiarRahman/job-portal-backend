@@ -6,6 +6,20 @@
 
 const emailConfig = require('../config/email');
 
+const EMAIL_SUBJECTS = {
+  'new-application': ({ jobTitle }) => `📝 New Application: ${jobTitle}`,
+  'interview': ({ jobTitle }) => `📅 [ACTION REQUIRED] Interview Scheduled: ${jobTitle}`,
+  'application-status': ({ status }) => `✅ Application Status Update: ${status}`,
+  'job-deadline': ({ jobTitle }) => `⏰ Application Deadline Approaching: ${jobTitle}`,
+  'job-expiring': ({ jobTitle }) => `⚠️ [URGENT] Your Job Posting Expires Soon: ${jobTitle}`,
+  'verification-pending': ({ companyName }) => `🔍 [REVIEW NEEDED] Employer Verification: ${companyName}`,
+};
+
+const getEmailSubject = (reminderType, data) => {
+  const subjectFn = EMAIL_SUBJECTS[reminderType];
+  return subjectFn ? subjectFn(data) : 'JobPortal Reminder';
+};
+
 /**
  * Send Email
  * @param {string} to - Recipient email
@@ -67,57 +81,71 @@ const getEmailTemplate = (template, data) => {
 // EMAIL TEMPLATES
 // ============================================
 
+const getEmailHeader = (brandColor = '#667eea') => `
+  <div style="background: linear-gradient(135deg, ${brandColor} 0%, #764ba2 100%); 
+              padding: 20px; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">JobPortal</h1>
+    <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0;">Stay Updated on Your Opportunities</p>
+  </div>
+`;
+
+const getEmailFooter = (preferencesUrl) => `
+  <div style="background: #f8f9fa; padding: 16px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e8e8e8; margin-top: 20px;">
+    <p style="margin: 0 0 8px 0;">© 2026 JobPortal. All rights reserved.</p>
+    <p style="margin: 8px 0;">
+      <a href="${preferencesUrl}" style="color: #667eea; text-decoration: none;">Email Preferences</a> | 
+      <a href="https://jobportal.com/help" style="color: #667eea; text-decoration: none;">Help Center</a>
+    </p>
+  </div>
+`;
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const preferencesUrl = \`\${FRONTEND_URL}/email-preferences\`;
+
 /**
  * Template: New Job Application
  * For: Employers
  */
 const reminderNewApplicationTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-      .badge { display: inline-block; background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>📧 New Application Received</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader()}
       
-      <div class="content">
-        <p>Hi <strong>${data.employerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">📝 New Application Received</h2>
         
-        <p>Great news! You have a new application for your job posting.</p>
-        
-        <h3>📋 Application Details:</h3>
-        <ul>
-          <li><strong>Job Title:</strong> ${data.jobTitle}</li>
-          <li><strong>Applicant:</strong> ${data.applicantName}</li>
-          <li><strong>Email:</strong> ${data.applicantEmail}</li>
-          <li><strong>Applied On:</strong> ${new Date().toLocaleDateString()}</li>
-        </ul>
-        
-        <p>
-          <a href="${data.applicationLink}" class="button">View Application</a>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.employerName}</strong>,
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          You have a new application for <strong>\${data.jobTitle}</strong> from <strong>\${data.applicantName}</strong>.
         </p>
         
-        <p><strong>Pro tip:</strong> Review applications promptly to attract top talent!</p>
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333;"><strong>Applicant Name:</strong> \${data.applicantName}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Email:</strong> \${data.applicantEmail}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Job:</strong> \${data.jobTitle}</p>
+          <p style="margin: 8px 0 0 0; color: #666; font-size: 12px;">Applied: \${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <a href="\${data.applicationLink || FRONTEND_URL + '/employer/applications'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          View Application →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-        <p>© 2026 Job Portal. All rights reserved.</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -125,53 +153,49 @@ const reminderNewApplicationTemplate = (data) => `
  * For: Seekers
  */
 const reminderInterviewScheduledTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .alert { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; border-radius: 4px; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>🎉 Interview Scheduled!</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader()}
       
-      <div class="content">
-        <p>Hi <strong>${data.seekerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">🎉 Interview Scheduled!</h2>
         
-        <p>Congratulations! ${data.companyName} has scheduled an interview with you!</p>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.seekerName}</strong>,
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Congratulations! \${data.companyName} has scheduled an interview with you!
+        </p>
         
-        <h3>📅 Interview Details:</h3>
-        <ul>
-          <li><strong>Position:</strong> ${data.jobTitle}</li>
-          <li><strong>Date:</strong> ${data.interviewDate}</li>
-          <li><strong>Time:</strong> ${data.interviewTime}</li>
-          <li><strong>Mode:</strong> ${data.interviewMode}</li>
-        </ul>
-        
-        <div class="alert">
-          <strong>⏰ Reminder:</strong> Your interview is in ${data.daysUntil} day(s). Please review the job description and prepare accordingly.
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333;"><strong>Position:</strong> \${data.jobTitle}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Date:</strong> \${data.interviewDate}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Time:</strong> \${data.interviewTime}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Mode:</strong> \${data.interviewMode}</p>
         </div>
         
-        <p>
-          <a href="${data.applicationLink}" class="button">View Full Details</a>
-        </p>
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <strong>⏰ Reminder:</strong> Your interview is in \${data.daysUntil} day(s). Please review the job description and prepare accordingly.
+        </div>
+        
+        <a href="\${data.applicationLink || FRONTEND_URL + '/seeker/applications'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          View Full Details →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -179,47 +203,37 @@ const reminderInterviewScheduledTemplate = (data) => `
  * For: Seekers
  */
 const reminderApplicationStatusUpdateTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .status { font-size: 18px; font-weight: bold; padding: 10px; text-align: center; border-radius: 6px; margin: 15px 0; }
-      .status-approved { background: #d1fae5; color: #065f46; }
-      .status-rejected { background: #fee2e2; color: #991b1b; }
-      .status-pending { background: #fef3c7; color: #92400e; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>📬 Application Status Update</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader()}
       
-      <div class="content">
-        <p>Hi <strong>${data.seekerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">📬 Application Status Update</h2>
         
-        <p>Your application for <strong>${data.jobTitle}</strong> at <strong>${data.companyName}</strong> has been updated.</p>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.seekerName}</strong>,
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Your application for <strong>\${data.jobTitle}</strong> at <strong>\${data.companyName}</strong> has been updated.
+        </p>
         
-        <div class="status status-${data.statusClass}">
-          Status: ${data.status.toUpperCase()}
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333; font-weight: bold;">Status: \${(data.status || '').toUpperCase()}</p>
         </div>
         
-        ${data.message ? `<p><strong>Message from Employer:</strong></p><p>${data.message}</p>` : ''}
-        
-        <p>Thank you for your interest!</p>
+        \${data.message ? \`<p style="color: #666;"><strong>Message from Employer:</strong><br/>\${data.message}</p>\` : ''}
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -227,52 +241,48 @@ const reminderApplicationStatusUpdateTemplate = (data) => `
  * For: Seekers
  */
 const reminderJobDeadlineTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .alert { background: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 15px 0; border-radius: 4px; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>⏰ Application Deadline Approaching</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader('#ef4444')}
       
-      <div class="content">
-        <p>Hi <strong>${data.seekerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">⏰ Application Deadline Approaching</h2>
         
-        <p>The application deadline for a job you've already applied to is closing soon!</p>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.seekerName}</strong>,
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          The application deadline for a job you might be interested in is closing soon!
+        </p>
         
-        <div class="alert">
-          <strong>⚠️ Only ${data.daysRemaining} day(s) remaining to apply for similar positions!</strong>
+        <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <strong>⚠️ Only \${data.daysRemaining} day(s) remaining to apply!</strong>
         </div>
         
-        <h3>Job Details:</h3>
-        <ul>
-          <li><strong>Position:</strong> ${data.jobTitle}</li>
-          <li><strong>Company:</strong> ${data.companyName}</li>
-          <li><strong>Deadline:</strong> ${data.deadline}</li>
-        </ul>
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333;"><strong>Position:</strong> \${data.jobTitle}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Company:</strong> \${data.companyName}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Deadline:</strong> \${data.deadline}</p>
+        </div>
         
-        <p>
-          <a href="${data.jobLink}" class="button">View & Apply</a>
-        </p>
+        <a href="\${data.jobLink || FRONTEND_URL + '/jobs'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          View & Apply →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -280,62 +290,47 @@ const reminderJobDeadlineTemplate = (data) => `
  * For: Employers
  */
 const reminderJobExpiringTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-      .stat-card { background: white; padding: 15px; border-radius: 6px; text-align: center; }
-      .stat-number { font-size: 24px; font-weight: bold; color: #6366f1; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>📢 Job Posting Expiring Soon</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader('#f59e0b')}
       
-      <div class="content">
-        <p>Hi <strong>${data.employerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">📢 Job Posting Expiring Soon</h2>
         
-        <p>Your job posting will expire in <strong>${data.daysRemaining} day(s)</strong>.</p>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.employerName}</strong>,
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Your job posting will expire in <strong>\${data.daysRemaining} day(s)</strong>.
+        </p>
         
-        <h3>Job Details:</h3>
-        <ul>
-          <li><strong>Position:</strong> ${data.jobTitle}</li>
-          <li><strong>Expiry Date:</strong> ${data.expiryDate}</li>
-        </ul>
-        
-        <div class="stats">
-          <div class="stat-card">
-            <div class="stat-number">${data.totalApplications}</div>
-            <div>Total Applications</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-number">${data.pendingApplications}</div>
-            <div>Pending Review</div>
-          </div>
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333;"><strong>Position:</strong> \${data.jobTitle}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Expiry Date:</strong> \${data.expiryDate}</p>
         </div>
         
-        <p>Renew your posting to continue receiving applications from qualified candidates.</p>
-        
-        <p>
-          <a href="${data.renewLink}" class="button">Renew Posting</a>
+        <p style="color: #666; line-height: 1.6;">
+          Renew your posting to continue receiving applications from qualified candidates.
         </p>
+        
+        <a href="\${data.renewLink || FRONTEND_URL + '/employer/jobs'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          Renew Posting →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -343,50 +338,47 @@ const reminderJobExpiringTemplate = (data) => `
  * For: Employers
  */
 const reminderPendingApplicationsTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .alert { background: #dbeafe; border-left: 4px solid #06b6d4; padding: 15px; margin: 15px 0; border-radius: 4px; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>📋 Pending Applications Waiting for Review</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader()}
       
-      <div class="content">
-        <p>Hi <strong>${data.employerName}</strong>,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">📋 Pending Applications Waiting for Review</h2>
         
-        <div class="alert">
-          <strong>ℹ️ You have <strong>${data.pendingCount}</strong> applications waiting for review!</strong>
+        <p style="color: #666; line-height: 1.6;">
+          Hi <strong>\${data.employerName}</strong>,
+        </p>
+        
+        <div style="background: #dbeafe; border-left: 4px solid #06b6d4; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <strong>ℹ️ You have \${data.pendingCount} applications waiting for review!</strong>
         </div>
         
-        <p>Don't miss out on great candidates. Review and respond to applications promptly.</p>
+        <p style="color: #666; line-height: 1.6;">
+          Don't miss out on great candidates. Review and respond to applications promptly.
+        </p>
         
-        <h3>Pending Jobs:</h3>
-        <ul>
-          ${data.jobs.map(job => `<li><strong>${job.title}</strong> - ${job.pendingCount} pending</li>`).join('')}
+        <ul style="color: #666;">
+          \${(data.jobs || []).map(job => \`<li><strong>\${job.title}</strong> - \${job.pendingCount} pending</li>\`).join('')}
         </ul>
         
-        <p>
-          <a href="${data.dashboardLink}" class="button">Review Applications</a>
-        </p>
+        <a href="\${data.dashboardLink || FRONTEND_URL + '/employer/applications'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          Review Applications →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Your Professional Recruitment Platform</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
@@ -394,82 +386,76 @@ const reminderPendingApplicationsTemplate = (data) => `
  * For: Admin
  */
 const reminderVerificationPendingTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-      .alert { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; border-radius: 4px; }
-      .button { display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
-      .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>👤 Employer Verification Pending</h1>
-      </div>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader('#8b5cf6')}
       
-      <div class="content">
-        <p>Hi Admin,</p>
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">👤 Employer Verification Pending</h2>
         
-        <div class="alert">
+        <p style="color: #666; line-height: 1.6;">
+          Hi Admin,
+        </p>
+        
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 16px 0; border-radius: 4px;">
           <strong>⚠️ New employer verification pending review!</strong>
         </div>
         
-        <h3>Employer Details:</h3>
-        <ul>
-          <li><strong>Company:</strong> ${data.companyName}</li>
-          <li><strong>Contact Person:</strong> ${data.contactName}</li>
-          <li><strong>Email:</strong> ${data.email}</li>
-          <li><strong>Registration Date:</strong> ${data.registrationDate}</li>
-        </ul>
+        <div style="background: #f0f4ff; border-left: 4px solid #667eea; padding: 12px; margin: 16px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #333;"><strong>Company:</strong> \${data.companyName}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Contact Person:</strong> \${data.contactName}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Email:</strong> \${data.email}</p>
+          <p style="margin: 8px 0 0 0; color: #333;"><strong>Registration Date:</strong> \${data.registrationDate}</p>
+        </div>
         
-        <p>Review and approve/reject this employer to proceed.</p>
-        
-        <p>
-          <a href="${data.verificationLink}" class="button">Review Employer</a>
-        </p>
+        <a href="\${data.verificationLink || FRONTEND_URL + '/admin/employers'}" 
+           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; 
+                   font-weight: 600; margin: 16px 0;">
+          Review Employer →
+        </a>
       </div>
       
-      <div class="footer">
-        <p>Job Portal - Admin Notification System</p>
-      </div>
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 /**
  * Default Template
  */
 const defaultTemplate = (data) => `
-<!DOCTYPE html>
-<html>
+  <!DOCTYPE html>
+  <html>
   <head>
-    <style>
-      body { font-family: Arial, sans-serif; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 8px; }
-      .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <h1>Job Portal Notification</h1>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      \${getEmailHeader()}
+      
+      <div style="padding: 24px;">
+        <h2 style="color: #333; margin-top: 0;">Job Portal Notification</h2>
+        <p style="color: #666; line-height: 1.6;">
+          \${data.message || 'You have a new notification from Job Portal.'}
+        </p>
       </div>
-      <div class="content">
-        <p>${data.message || 'You have a new notification from Job Portal.'}</p>
-      </div>
+      
+      \${getEmailFooter(preferencesUrl)}
     </div>
   </body>
-</html>
+  </html>
 `;
 
 module.exports = {
   sendEmail,
+  getEmailSubject,
 };

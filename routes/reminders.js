@@ -26,6 +26,9 @@ router.delete('/:id', authenticate, reminderController.dismissReminder);
 // Mark all reminders as viewed
 router.put('/mark-all/viewed', authenticate, reminderController.markAllAsViewed);
 
+// Subscribe to push notifications
+router.post('/push-subscribe', authenticate, reminderController.subscribeToPush);
+
 // ============ ADMIN-ONLY ROUTES ============
 
 // Create reminder (Admin/System)

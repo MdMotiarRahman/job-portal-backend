@@ -6,6 +6,35 @@
 const Reminder = require('../models/Reminder');
 const { sendEmail } = require('./emailService');
 const cron = require('node-cron');
+const webpush = require('web-push');
+
+const vapidKeys = {
+  publicKey: process.env.VAPID_PUBLIC_KEY || 'YOUR_PUBLIC_VAPID_KEY',
+  privateKey: process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_VAPID_KEY'
+};
+
+webpush.setVapidDetails(
+  'mailto:support@jobportal.com',
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
+
+const sendPushNotification = async (user, payload) => {
+  if (!user || !user.pushSubscriptions || user.pushSubscriptions.length === 0) return;
+
+  const notifications = user.pushSubscriptions.map(sub => 
+    webpush.sendNotification(sub, JSON.stringify(payload)).catch(err => {
+      console.error('Error sending push notification:', err);
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        // Subscription expired
+        user.pushSubscriptions = user.pushSubscriptions.filter(s => s.endpoint !== sub.endpoint);
+        return user.save();
+      }
+    })
+  );
+
+  await Promise.all(notifications);
+};
 
 /**
  * Create a new reminder
@@ -300,6 +329,13 @@ const sendPendingReminders = async () => {
         );
 
         if (result.success) {
+          // Send Web Push Notification
+          await sendPushNotification(reminder.user, {
+            title: reminder.title,
+            body: reminder.description,
+            url: reminder.templateData?.applicationLink || reminder.templateData?.jobLink || '/',
+          });
+
           // Update reminder as sent
           reminder.status = 'sent';
           reminder.emailSent = true;
@@ -391,6 +427,94 @@ const cleanupOldReminders = async () => {
   }
 };
 
+// Create a digest combining multiple reminders
+const createDigest = async (userId, reminders, frequencyType) => {
+  try {
+    const digest = new Reminder({
+      user: userId,
+      type: `digest-${frequencyType}`,
+      title: `Your ${frequencyType.toUpperCase()} Digest`,
+      description: `${reminders.length} reminders for ${frequencyType} digest`,
+      dueDate: new Date(),
+      status: 'pending',
+      templateData: {
+        title: `Your ${frequencyType.toUpperCase()} Digest`,
+        message: `You have ${reminders.length} reminders`,
+        reminders: reminders.map(r => ({
+          type: r.type,
+          title: r.templateData?.title || r.title,
+          message: r.templateData?.message || r.description,
+          createdAt: r.createdAt,
+        })),
+      },
+    });
+
+    await digest.save();
+    console.log(`✉️ Digest created for user ${userId}: ${reminders.length} reminders`);
+    return digest;
+  } catch (error) {
+    console.error('Error creating digest:', error);
+  }
+};
+
+// Send daily digest emails
+const sendDailyDigest = async () => {
+  try {
+    const EmailPreference = require('../models/EmailPreference');
+    
+    // Get users with daily digest enabled
+    const users = await EmailPreference.find({
+      'digestPreferences.enabled': true,
+      'digestPreferences.frequency': 'daily',
+    }).select('user');
+
+    for (const pref of users) {
+      // Get user's reminders from last 24 hours
+      const reminders = await Reminder.find({
+        user: pref.user,
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        status: 'pending',
+      }).limit(10);
+
+      if (reminders.length > 0) {
+        await createDigest(pref.user, reminders, 'daily');
+      }
+    }
+
+    console.log('✉️ Daily digests queued');
+  } catch (error) {
+    console.error('Error sending daily digests:', error);
+  }
+};
+
+// Send weekly digest emails
+const sendWeeklyDigest = async () => {
+  try {
+    const EmailPreference = require('../models/EmailPreference');
+    
+    const users = await EmailPreference.find({
+      'digestPreferences.enabled': true,
+      'digestPreferences.frequency': 'weekly',
+    }).select('user');
+
+    for (const pref of users) {
+      const reminders = await Reminder.find({
+        user: pref.user,
+        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        status: 'pending',
+      }).limit(20);
+
+      if (reminders.length > 0) {
+        await createDigest(pref.user, reminders, 'weekly');
+      }
+    }
+
+    console.log('✉️ Weekly digests queued');
+  } catch (error) {
+    console.error('Error sending weekly digests:', error);
+  }
+};
+
 /**
  * Initialize scheduled reminder tasks (Cron jobs)
  * Call this in your main app.js or index.js
@@ -414,6 +538,18 @@ const initializeReminderSchedules = () => {
   cron.schedule('0 2 * * *', async () => {
     console.log('⏰ [Cron Job] Running: Clean up old reminders (daily 2 AM)');
     await cleanupOldReminders();
+  });
+
+  // Daily digest at 9 AM
+  cron.schedule('0 9 * * *', () => {
+    console.log('⏰ [Cron Job] Running: Daily digest job...');
+    sendDailyDigest();
+  });
+
+  // Weekly digest on Monday at 9 AM
+  cron.schedule('0 9 * * 1', () => {
+    console.log('⏰ [Cron Job] Running: Weekly digest job...');
+    sendWeeklyDigest();
   });
 
   console.log('✅ Reminder schedules initialized');
@@ -481,6 +617,8 @@ const createNewApplicationReminder = async (employerId, applicationData) => {
         applicantName: applicationData.applicantName,
         applicantEmail: applicationData.applicantEmail,
         applicationLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/employer/applications/${applicationData.applicationId}`,
+        tags: ['action-required'],
+        urgencyLevel: 'high',
       },
     });
 

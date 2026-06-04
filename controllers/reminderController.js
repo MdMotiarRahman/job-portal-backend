@@ -400,3 +400,46 @@ exports.manualCleanup = async (req, res) => {
     });
   }
 };
+
+/**
+ * @route   POST /api/reminders/push-subscribe
+ * @desc    Subscribe user to web push notifications
+ * @access  Private
+ */
+exports.subscribeToPush = async (req, res) => {
+  try {
+    const subscription = req.body;
+    const User = require('../models/User');
+
+    // Make sure subscription exists
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ success: false, message: 'Invalid subscription object' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Initialize pushSubscriptions array if it doesn't exist
+    if (!user.pushSubscriptions) {
+      user.pushSubscriptions = [];
+    }
+
+    // Check if subscription already exists to avoid duplicates
+    const isSubscribed = user.pushSubscriptions.some(sub => sub.endpoint === subscription.endpoint);
+    
+    if (!isSubscribed) {
+      user.pushSubscriptions.push(subscription);
+      await user.save();
+    }
+
+    res.status(201).json({ success: true, message: 'Push subscription successful' });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error saving push subscription',
+      error: error.message,
+    });
+  }
+};

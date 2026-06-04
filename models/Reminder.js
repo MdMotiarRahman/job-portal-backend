@@ -13,17 +13,7 @@ const ReminderSchema = new mongoose.Schema(
     // Type of reminder
     type: {
       type: String,
-      enum: [
-        'new_application',          // New application for employer
-        'interview_scheduled',      // Interview scheduled for seeker
-        'application_status_update', // Application status changed
-        'job_deadline',             // Job application deadline approaching
-        'job_expiring',             // Job posting expiring soon
-        'pending_applications',     // Employer has pending reviews
-        'verification_pending',     // Admin: Employer verification pending
-        'application_follow_up',    // Seeker follow-up after application
-        'job_matches',              // New jobs matching seeker skills
-      ],
+      // No strict enum to allow digest-* and dynamically added reminder types
       required: true,
       index: true,
     },
@@ -114,8 +104,28 @@ const ReminderSchema = new mongoose.Schema(
 
     // Custom data for email templates
     templateData: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
+      tags: {
+        type: [String],
+        enum: ['urgent', 'follow-up', 'info-only', 'action-required', 'confirmation'],
+        default: [],
+        index: true,
+      },
+      urgencyLevel: {
+        type: String,
+        enum: ['low', 'medium', 'high', 'critical'],
+        default: 'medium',
+      },
+      title: String,
+      message: String,
+      applicantName: String,
+      jobTitle: String,
+      applicationId: String,
+      companyName: String,
+      contactName: String,
+      email: String,
+      registrationDate: String,
+      reminders: [mongoose.Schema.Types.Mixed],
+      // Allow other properties
     },
 
     // Is active reminder
