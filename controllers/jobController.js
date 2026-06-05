@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Job = require('../models/Job');
+const EmployerProfile = require('../models/EmployerProfile');
+const JobApplication = require('../models/JobApplication');
 
 const buildPublicJobFilter = (query) => {
   const { search, location, jobType, experienceLevel } = query;
@@ -60,6 +62,44 @@ exports.getPublicJobs = async (req, res) => {
         pages: Math.ceil(total / limit) || 1,
         limit,
       },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getPublicJobSnapshot = async (req, res) => {
+  try {
+    const publicJobFilter = buildPublicJobFilter({});
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [openJobs, employers, recentApplications, featuredJobs] = await Promise.all([
+      Job.countDocuments(publicJobFilter),
+      EmployerProfile.countDocuments({
+        $or: [
+          { isVerified: true },
+          { verificationStatus: 'approved' },
+        ],
+      }),
+      JobApplication.countDocuments({
+        createdAt: { $gte: thirtyDaysAgo },
+      }),
+      Job.find(publicJobFilter)
+        .populate('company', 'name email')
+        .select('title company location jobType salary createdAt')
+        .sort({ createdAt: -1 })
+        .limit(3),
+    ]);
+
+    res.json({
+      metrics: {
+        openJobs,
+        employers,
+        recentApplications,
+      },
+      featuredJobs,
     });
   } catch (error) {
     console.error(error);
