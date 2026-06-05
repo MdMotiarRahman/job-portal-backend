@@ -549,10 +549,14 @@ const sendWeeklyDigest = async () => {
  */
 const initializeReminderSchedules = () => {
   // Avoid starting background cron jobs during Jest/tests or when explicitly disabled.
-  if (process.env.NODE_ENV === 'test' || process.env.DISABLE_REMINDER_SCHEDULES === 'true') {
-    console.log('⏰ Reminder schedules not initialized (test environment / disabled).');
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.DISABLE_REMINDER_SCHEDULES === 'true' ||
+    process.env.JEST_WORKER_ID !== undefined
+  ) {
     return;
   }
+
 
   console.log('⏰ Initializing reminder schedules...');
 
