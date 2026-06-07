@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleware');
+const { authenticate } = require('../middleware/authMiddleware');
 const EmailPreference = require('../models/EmailPreference');
 
 // Get user's email preferences
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     let preferences = await EmailPreference.findOne({ user: req.user.id });
     
@@ -20,7 +20,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Update email preferences
-router.put('/', authMiddleware, async (req, res) => {
+router.put('/', authenticate, async (req, res) => {
   try {
     const { reminderPreferences, unsubscribeAll, quietHours, digestPreferences } = req.body;
     

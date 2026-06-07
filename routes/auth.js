@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { register, login, me } = require('../controllers/authController');
-const authenticate = require('../middleware/authMiddleware');
+const { authenticate } = require('../middleware/authMiddleware');
 
 // @route   POST api/auth/register
 // @desc    Register a user

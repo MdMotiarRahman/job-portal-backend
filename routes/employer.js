@@ -1,6 +1,5 @@
 const express = require('express');
-const authenticate = require('../middleware/authMiddleware');
-const { requireRole } = require('../middleware/authMiddleware');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
 const {
   closeJob,
   createJob,

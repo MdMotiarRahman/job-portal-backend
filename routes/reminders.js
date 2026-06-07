@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const reminderController = require('../controllers/reminderController');
-const authenticate = require('../middleware/authMiddleware');
+const { authenticate } = require('../middleware/authMiddleware');
 
 // ============ PROTECTED ROUTES (Require Authentication) ============
 

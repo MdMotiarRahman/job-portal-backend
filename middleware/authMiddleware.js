@@ -86,6 +86,8 @@ const checkPermission = (requiredPermissions) => {
   };
 };
 
-module.exports = authenticate;
-module.exports.requireRole = requireRole;
-module.exports.checkPermission = checkPermission;
+module.exports = {
+  authenticate,
+  requireRole,
+  checkPermission,
+};

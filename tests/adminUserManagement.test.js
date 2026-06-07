@@ -5,8 +5,7 @@ const jwt = require('jsonwebtoken');
 const app = require('express')();
 
 // Minimal app wiring for admin routes so tests can run without starting the full server
-const authenticate = require('../middleware/authMiddleware');
-const { requireRole } = require('../middleware/authMiddleware');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
 const adminRouter = require('../routes/admin');
 
 app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
