@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, me } = require('../controllers/authController');
+const { register, login, me, updateMe } = require('../controllers/authController');
 const { authenticate } = require('../middleware/authMiddleware');
 
 // @route   POST api/auth/register
@@ -17,5 +17,10 @@ router.post('/login', login);
 // @desc    Get current authenticated user
 // @access  Private
 router.get('/me', authenticate, me);
+
+// @route   PUT api/auth/me
+// @desc    Update current authenticated user
+// @access  Private
+router.put('/me', authenticate, updateMe);
 
 module.exports = router;

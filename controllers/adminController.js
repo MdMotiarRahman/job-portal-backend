@@ -340,7 +340,7 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, phone, location, adminNotes } = req.body;
+    const { name, email, phone, location, adminNotes, role, permissions } = req.body;
 
     const user = await User.findById(userId);
     if (!user) {
@@ -357,9 +357,11 @@ exports.updateUser = async (req, res) => {
     }
 
     if (name) user.name = name;
-    if (phone) user.phone = phone;
-    if (location) user.location = location;
+    if (phone !== undefined) user.phone = phone;
+    if (location !== undefined) user.location = location;
     if (adminNotes !== undefined) user.adminNotes = adminNotes;
+    if (role) user.role = role;
+    if (permissions !== undefined) user.permissions = permissions;
 
     user.updatedBy = req.user.id;
 
