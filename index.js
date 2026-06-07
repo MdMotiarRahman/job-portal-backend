@@ -54,6 +54,10 @@ app.use('/api/seeker', require('./routes/seeker'));
 app.use('/api/employer', require('./routes/employer'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/email-preferences', require('./routes/emailPreferences'));
+app.use('/api/ats', require('./routes/ats'));
+app.use('/api/interviews', require('./routes/interviews'));
+app.use('/api/offers', require('./routes/offers'));
+app.use('/api/search', require('./routes/search'));
 
 // Multer / server error handler
 app.use((err, req, res, next) => {
