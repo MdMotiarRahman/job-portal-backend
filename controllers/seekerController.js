@@ -7,6 +7,7 @@ const EmployerProfile = require('../models/EmployerProfile');
 const configureCloudinary = require('../config/cloudinary');
 const mongoose = require('mongoose');
 const { createNewApplicationReminder } = require('../utils/reminderService');
+const { initializeApplicationStage } = require('./atsController');
 
 let cloudinaryClient;
 
@@ -288,6 +289,10 @@ const applyJob = async (req, res) => {
     });
 
     await application.save();
+
+    if (job) {
+      await initializeApplicationStage(application);
+    }
 
     if (job) {
       job.applications.addToSet(application._id);

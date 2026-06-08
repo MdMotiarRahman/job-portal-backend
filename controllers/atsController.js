@@ -45,12 +45,20 @@ const VALID_TRANSITIONS = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
-const buildApplicationFilter = (req) => {
+const buildApplicationFilter = async (req) => {
   const filter = {};
   const isAdmin = req.user.role === 'admin';
 
   if (!isAdmin) {
-    filter.employer = req.user.id;
+    // Get all job IDs owned by this employer
+    const employerJobs = await Job.find({ company: req.user.id }).select('_id');
+    const employerJobIds = employerJobs.map((j) => j._id);
+
+    // Match by employer field OR by job belonging to this employer
+    filter.$or = [
+      { employer: req.user.id },
+      { job: { $in: employerJobIds } },
+    ];
   }
 
   if (req.query.jobId) {
@@ -63,11 +71,14 @@ const buildApplicationFilter = (req) => {
 
   if (req.query.search) {
     const searchRegex = new RegExp(req.query.search, 'i');
-    filter.$or = [
-      { 'seeker.name': { $regex: searchRegex } },
-      { 'seeker.email': { $regex: searchRegex } },
-      { 'job.title': { $regex: searchRegex } },
-    ];
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      $or: [
+        { 'seeker.name': { $regex: searchRegex } },
+        { 'seeker.email': { $regex: searchRegex } },
+        { 'job.title': { $regex: searchRegex } },
+      ],
+    });
   }
 
   if (req.query.dateFrom || req.query.dateTo) {
@@ -79,16 +90,76 @@ const buildApplicationFilter = (req) => {
   return filter;
 };
 
+// ─── Auto-sync missing ApplicationStage records ───────────────────
+const syncMissingApplicationStages = async (employerId = null) => {
+  try {
+    const jobFilter = employerId ? { company: employerId } : {};
+    const jobs = await Job.find(jobFilter).select('_id company');
+    const jobMap = {};
+    jobs.forEach((j) => { jobMap[j._id.toString()] = j; });
+
+    const jobIds = jobs.map((j) => j._id);
+    if (jobIds.length === 0) {
+      console.log(`ATS Sync: No jobs found for employer ${employerId || 'all'}`);
+      return 0;
+    }
+
+    const existingStages = await ApplicationStage.find({ job: { $in: jobIds } }).select('application');
+    const existingAppIds = new Set(existingStages.map((s) => s.application.toString()));
+
+    const missingApps = await JobApplication.find({
+      job: { $in: jobIds },
+      _id: { $nin: Array.from(existingAppIds) },
+    });
+
+    console.log(`ATS Sync: Found ${jobs.length} jobs, ${existingStages.length} existing stages, ${missingApps.length} missing`);
+
+    let created = 0;
+    for (const app of missingApps) {
+      const job = jobMap[app.job?.toString()];
+      if (!job) continue;
+
+      await ApplicationStage.create({
+        application: app._id,
+        job: app.job,
+        seeker: app.seeker,
+        employer: job.company || employerId || null,
+        stage: 'Applied',
+        previousStage: null,
+        movedBy: app.seeker,
+        movedByRole: 'system',
+        notes: 'Auto-created during sync',
+      });
+      created++;
+    }
+
+    if (created > 0) {
+      console.log(`ATS Sync: Created ${created} missing ApplicationStage records`);
+    }
+    return created;
+  } catch (error) {
+    console.error('ATS Sync Error:', error);
+    return 0;
+  }
+};
+
 const getActiveApplications = async (filter) => {
   return ApplicationStage.aggregate([
     { $match: { ...filter, isActive: true } },
+    { $sort: { createdAt: -1 } },
     {
       $group: {
         _id: '$application',
-        doc: { $last: '$$ROOT' },
+        doc: { $first: '$$ROOT' },
       },
     },
-    { $replaceRoot: { newRoot: '$doc' } },
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: ['$doc', { _id: '$_id' }],
+        },
+      },
+    },
     {
       $lookup: {
         from: 'users',
@@ -126,16 +197,27 @@ const getActiveApplications = async (filter) => {
 // ─── Pipeline Stats ───────────────────────────────────────────────
 const getPipelineStats = async (req, res) => {
   try {
-    const filter = buildApplicationFilter(req);
+    // Auto-sync missing ApplicationStage records
+    const employerId = req.user.role !== 'admin' ? req.user.id : null;
+    await syncMissingApplicationStages(employerId);
+
+    const filter = await buildApplicationFilter(req);
     const pipeline = [
       { $match: { ...filter, isActive: true } },
+      { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: '$application',
-          doc: { $last: '$$ROOT' },
+          doc: { $first: '$$ROOT' },
         },
       },
-      { $replaceRoot: { newRoot: '$doc' } },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: ['$doc', { _id: '$_id' }],
+          },
+        },
+      },
       {
         $group: {
           _id: '$stage',
@@ -228,7 +310,11 @@ const getPipelineStats = async (req, res) => {
 // ─── Get Pipeline Board ───────────────────────────────────────────
 const getPipelineBoard = async (req, res) => {
   try {
-    const filter = buildApplicationFilter(req);
+    // Auto-sync missing ApplicationStage records
+    const employerId = req.user.role !== 'admin' ? req.user.id : null;
+    await syncMissingApplicationStages(employerId);
+
+    const filter = await buildApplicationFilter(req);
     const applications = await getActiveApplications(filter);
 
     // Group by stage
@@ -267,11 +353,18 @@ const moveApplicationStage = async (req, res) => {
       return res.status(400).json({ success: false, message: `Invalid stage. Must be one of: ${STAGES.join(', ')}` });
     }
 
-    // Get current active stage
-    const currentStage = await ApplicationStage.findOne({
+    // Get current active stage — try by application field first, then by _id
+    let currentStage = await ApplicationStage.findOne({
       application: applicationId,
       isActive: true,
     }).sort({ createdAt: -1 });
+
+    if (!currentStage) {
+      currentStage = await ApplicationStage.findOne({
+        _id: applicationId,
+        isActive: true,
+      }).sort({ createdAt: -1 });
+    }
 
     if (!currentStage) {
       return res.status(404).json({ success: false, message: 'Application not found in pipeline.' });
@@ -371,7 +464,7 @@ const bulkMoveApplications = async (req, res) => {
           application: applicationId,
           job: currentStage.job,
           seeker: currentStage.seeker,
-          employer: currentStage.employer,
+      employer: currentStage.employer || req.user.id,
           stage,
           previousStage: currentStage.stage,
           movedBy: req.user.id,
@@ -423,10 +516,11 @@ const getEmployerATSStats = async (req, res) => {
 
     const pipeline = [
       { $match: employerFilter },
+      { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: '$application',
-          doc: { $last: '$$ROOT' },
+          doc: { $first: '$$ROOT' },
         },
       },
       { $replaceRoot: { newRoot: '$doc' } },
@@ -490,7 +584,7 @@ const initializeApplicationStage = async (application) => {
       application: application._id,
       job: application.job,
       seeker: application.seeker,
-      employer: job?.employer || null,
+      employer: job?.company || null,
       stage: 'Applied',
       previousStage: null,
       movedBy: application.seeker,
@@ -508,14 +602,27 @@ const mapStageToStatus = (stage) => {
     Screening: 'Pending',
     Reviewing: 'Reviewing',
     Shortlisted: 'Shortlisted',
-    'Interview Scheduled': 'Interview',
-    Assessment: 'Interview',
+    'Interview Scheduled': 'Interview Scheduled',
+    Assessment: 'Interview Scheduled',
     'Offer Extended': 'Accepted',
     Accepted: 'Accepted',
     Rejected: 'Rejected',
     Withdrawn: 'Rejected',
   };
   return mapping[stage] || 'Pending';
+};
+
+// ─── Status-to-Stage Mapping (reverse) ────────────────────────────
+const mapStatusToStage = (status) => {
+  const mapping = {
+    Pending: 'Applied',
+    Reviewing: 'Reviewing',
+    Shortlisted: 'Shortlisted',
+    'Interview Scheduled': 'Interview Scheduled',
+    Accepted: 'Accepted',
+    Rejected: 'Rejected',
+  };
+  return mapping[status] || null;
 };
 
 module.exports = {
@@ -529,4 +636,6 @@ module.exports = {
   getStageHistory,
   getEmployerATSStats,
   initializeApplicationStage,
+  mapStageToStatus,
+  mapStatusToStage,
 };

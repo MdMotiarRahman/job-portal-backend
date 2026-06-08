@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
 const JobApplication = require('../models/JobApplication');
+const ApplicationStage = require('../models/ApplicationStage');
 const User = require('../models/User');
 const { createJobExpiringReminder } = require('../utils/reminderService');
 
@@ -410,6 +411,54 @@ exports.updateApplication = async (req, res) => {
     )
       .populate('seeker', 'name email phone location')
       .populate('job', 'title location company');
+
+    if (req.body.status !== undefined) {
+      const statusToStage = {
+        Pending: 'Applied',
+        Reviewing: 'Reviewing',
+        Shortlisted: 'Shortlisted',
+        'Interview Scheduled': 'Interview Scheduled',
+        Accepted: 'Accepted',
+        Rejected: 'Rejected',
+      };
+
+      const targetStage = statusToStage[req.body.status];
+      if (targetStage) {
+        const currentActive = await ApplicationStage.findOne({
+          application: application._id,
+          isActive: true,
+        }).sort({ createdAt: -1 });
+
+        if (currentActive && currentActive.stage !== targetStage) {
+          currentActive.isActive = false;
+          await currentActive.save();
+
+          await ApplicationStage.create({
+            application: application._id,
+            job: application.job._id,
+            seeker: application.seeker,
+            employer: req.user.id,
+            stage: targetStage,
+            previousStage: currentActive.stage,
+            movedBy: req.user.id,
+            movedByRole: 'employer',
+            notes: req.body.employerMessage || '',
+          });
+        } else if (!currentActive) {
+          await ApplicationStage.create({
+            application: application._id,
+            job: application.job._id,
+            seeker: application.seeker,
+            employer: req.user.id,
+            stage: targetStage,
+            previousStage: null,
+            movedBy: req.user.id,
+            movedByRole: 'employer',
+            notes: req.body.employerMessage || '',
+          });
+        }
+      }
+    }
 
     res.json({
       message: 'Application updated successfully.',

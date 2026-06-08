@@ -1,10 +1,12 @@
 const User = require('../models/User');
 const Job = require('../models/Job');
 const JobApplication = require('../models/JobApplication');
+const ApplicationStage = require('../models/ApplicationStage');
 const SeekerProfile = require('../models/SeekerProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const { mapStatusToStage } = require('../controllers/atsController');
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 const experienceLevels = ['Entry', 'Mid', 'Senior'];
@@ -936,7 +938,7 @@ exports.updateApplicationStatus = async (req, res) => {
     const appId = req.params.id;
     const { status } = req.body;
 
-    const validStatuses = ['Pending', 'Approved', 'Rejected', 'Hired'];
+    const validStatuses = ['Pending', 'Reviewing', 'Shortlisted', 'Interview Scheduled', 'Accepted', 'Rejected'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -958,6 +960,44 @@ exports.updateApplicationStatus = async (req, res) => {
 
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
+    }
+
+    // Sync ApplicationStage with the new status
+    const targetStage = mapStatusToStage(status);
+    if (targetStage) {
+      const currentActive = await ApplicationStage.findOne({
+        application: appId,
+        isActive: true,
+      }).sort({ createdAt: -1 });
+
+      if (currentActive && currentActive.stage !== targetStage) {
+        currentActive.isActive = false;
+        await currentActive.save();
+
+        await ApplicationStage.create({
+          application: appId,
+          job: application.job?._id || application.job,
+          seeker: application.seeker?._id || application.seeker,
+          employer: application.job?.company?._id || application.job?.company || null,
+          stage: targetStage,
+          previousStage: currentActive.stage,
+          movedBy: req.user.id,
+          movedByRole: 'admin',
+          notes: `Status changed to ${status} by admin`,
+        });
+      } else if (!currentActive) {
+        await ApplicationStage.create({
+          application: appId,
+          job: application.job?._id || application.job,
+          seeker: application.seeker?._id || application.seeker,
+          employer: application.job?.company?._id || application.job?.company || null,
+          stage: targetStage,
+          previousStage: null,
+          movedBy: req.user.id,
+          movedByRole: 'admin',
+          notes: `Status changed to ${status} by admin`,
+        });
+      }
     }
 
     res.json({
