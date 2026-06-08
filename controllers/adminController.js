@@ -360,7 +360,30 @@ exports.updateUser = async (req, res) => {
     if (phone !== undefined) user.phone = phone;
     if (location !== undefined) user.location = location;
     if (adminNotes !== undefined) user.adminNotes = adminNotes;
-    if (role) user.role = role;
+    
+    // Role change profile management
+    const oldRole = user.role;
+    if (role && role !== oldRole) {
+      user.role = role;
+      
+      // If promoting to employer, generate profile so they can login and use dashboard
+      if (role === 'employer') {
+        await EmployerProfile.findOneAndUpdate(
+          { user: user._id },
+          { $setOnInsert: { user: user._id, companyName: user.name || user.email, verificationStatus: 'pending' } },
+          { upsert: true }
+        );
+      } 
+      // If demoting to seeker, generate seeker profile
+      else if (role === 'seeker') {
+        await SeekerProfile.findOneAndUpdate(
+          { user: user._id },
+          { $setOnInsert: { user: user._id, fullName: user.name || '' } },
+          { upsert: true }
+        );
+      }
+    }
+    
     if (permissions !== undefined) user.permissions = permissions;
 
     user.updatedBy = req.user.id;
