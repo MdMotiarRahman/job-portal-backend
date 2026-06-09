@@ -1,58 +1,35 @@
 const express = require('express');
-
 const router = express.Router();
 
-const {
-  verifyToken,
-  isSeeker
-} = require('../middleware/authMiddleware');
-
-const upload =
-require('../middleware/upload');
-
-const seekerController =
-require('../controllers/seekerController');
+const { authenticate } = require('../middleware/authMiddleware');
+const upload = require('../middleware/upload');
 
 const {
   getMyProfile,
   updateMyProfile,
   applyJob,
   getMyApplications,
-} = seekerController;
+} = require('../controllers/seekerController');
 
+router.get('/profile', authenticate, getMyProfile);
 
-// GET PROFILE
-router.get(
-  '/profile',
-  verifyToken,
-  getMyProfile
-);
-
-
-// UPDATE PROFILE
 router.put(
   '/profile',
-  verifyToken,
-  upload.single('profileImage'),
+  authenticate,
+  upload.fields([
+    { name: 'profileImage', maxCount: 1 },
+    { name: 'resume', maxCount: 1 },
+  ]),
   updateMyProfile
 );
 
-
-// APPLY JOB
 router.post(
-  '/apply/:jobId',
-  verifyToken,
-  isSeeker,
+  '/apply',
+  authenticate,
   upload.single('resume'),
   applyJob
 );
 
-
-// GET APPLICATIONS
-router.get(
-  '/applications',
-  verifyToken,
-  getMyApplications
-);
+router.get('/applications', authenticate, getMyApplications);
 
 module.exports = router;

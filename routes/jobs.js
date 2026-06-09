@@ -1,18 +1,13 @@
-const router = require("express").Router();
+const express = require('express');
+const router = express.Router();
+const {
+  getPublicJobs,
+  getPublicJobSnapshot,
+  getPublicJobById,
+} = require('../controllers/jobController');
 
-const jobController = require(
-  "../controllers/jobController"
-);
-
-
-// ============================
-// GET APPROVED JOBS
-// ============================
-
-router.get(
-  "/",
-  jobController.getApprovedJobs
-);
-
+router.get('/', getPublicJobs);
+router.get('/snapshot', getPublicJobSnapshot);
+router.get('/:id', getPublicJobById);
 
 module.exports = router;

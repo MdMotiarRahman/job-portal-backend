@@ -1,63 +1,33 @@
-const express = require("express");
+const express = require('express');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
+const {
+  closeJob,
+  createJob,
+  deleteJob,
+  getApplications,
+  getEmployerSummary,
+  getMyJobs,
+  reopenJob,
+  updateApplication,
+  updateJob,
+} = require('../controllers/employerController');
 
 const router = express.Router();
 
-const {
-  verifyToken,
-  isEmployer,
-} = require("../middleware/authMiddleware");
+router.use(authenticate);
+router.use(requireRole('employer'));
 
-const employerController = require(
-  "../controllers/employerController"
-);
+router.get('/summary', getEmployerSummary);
 
+router.get('/jobs', getMyJobs);
+router.post('/jobs', createJob);
+router.put('/jobs/:id', updateJob);
+router.delete('/jobs/:id', deleteJob);
+router.put('/jobs/:id/close', closeJob);
+router.put('/jobs/:id/reopen', reopenJob);
 
-// ============================
-// CREATE JOB
-// ============================
-
-router.post(
-  "/jobs",
-  verifyToken,
-  isEmployer,
-  employerController.createJob
-);
-
-
-// ============================
-// GET EMPLOYER JOBS
-// ============================
-
-router.get(
-  "/jobs",
-  verifyToken,
-  isEmployer,
-  employerController.getEmployerJobs
-);
-
-
-// ============================
-// GET JOB APPLICANTS
-// ============================
-
-router.get(
-  "/applications/:jobId",
-  verifyToken,
-  isEmployer,
-  employerController.getJobApplicants
-);
-
-
-// ============================
-// UPDATE APPLICATION STATUS
-// ============================
-
-router.put(
-  "/applications/:applicationId",
-  verifyToken,
-  isEmployer,
-  employerController.updateApplicationStatus
-);
-
+router.get('/applications', getApplications);
+router.get('/applications/:jobId', getApplications);
+router.put('/applications/:id', updateApplication);
 
 module.exports = router;

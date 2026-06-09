@@ -1,11 +1,3 @@
-const User = require("../models/User");
-const Job = require("../models/Job");
-const JobApplication = require("../models/jobapplication");
-
-
-// ============================
-// GET MY PROFILE
-// ============================
 const fs = require('fs');
 const User = require('../models/User');
 const SeekerProfile = require('../models/SeekerProfile');
@@ -39,23 +31,6 @@ const removeLocalFile = (filePath) => {
 
 const uploadToCloudinary = async (file, options = {}) => {
   if (!file) return null;
-
-  const hasCloudinaryConfig =
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET;
-
-  // Development fallback: save file locally if Cloudinary is not configured
-  if (!hasCloudinaryConfig) {
-    return {
-      url: `/uploads/${file.filename}`,
-      publicId: '',
-      resourceType: options.resourceType || 'raw',
-      format: file.mimetype || '',
-      bytes: file.size || 0,
-      uploadedAt: new Date(),
-    };
-  }
 
   const cloudinary = getCloudinaryClient();
   const uploadOptions = {
@@ -114,197 +89,270 @@ const getPublicJobVisibilityFilter = (jobId) => ({
 });
 
 const getMyProfile = async (req, res) => {
-
   try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-    const user = await User.findById(
-      req.userId
-    ).select("-password");
+    const profile = await SeekerProfile.findOneAndUpdate(
+      { user: req.user.id },
+      {
+        $setOnInsert: {
+          user: req.user.id,
+          fullName: user.name || '',
+          phone: user.phone || '',
+          location: user.location || '',
+          skills: user.skills || '',
+          education: user.education || '',
+          experience: user.experience || '',
+          linkedin: user.linkedin || '',
+          github: user.github || '',
+          bio: user.bio || '',
+          profileImage: {
+            url: user.profileImage || '',
+          },
+          resume: {
+            url: user.resume || '',
+          },
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
 
-    res.json(user);
-
-  } catch (error) {
-
-    console.log(error);
-
-    res.status(500).json({
-      message: "Server Error",
+    res.json({
+      ...user.toObject(),
+      name: profile.fullName || user.name || '',
+      fullName: profile.fullName || user.name || '',
+      phone: profile.phone || '',
+      location: profile.location || '',
+      skills: profile.skills || '',
+      education: profile.education || '',
+      experience: profile.experience || '',
+      linkedin: profile.linkedin || '',
+      github: profile.github || '',
+      bio: profile.bio || '',
+      profileImage: profile.profileImage?.url || '',
+      profileImageMeta: profile.profileImage || null,
+      resume: profile.resume?.url || '',
+      resumeMeta: profile.resume || null,
     });
-
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: 'Server Error',
+    });
   }
-
 };
-
-
-// ============================
-// UPDATE PROFILE
-// ============================
 
 const updateMyProfile = async (req, res) => {
-
   try {
+    const existingUser = await User.findById(req.user.id).select('-password');
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const updatedData = {
-
-      name: req.body.fullName || "",
-
-      phone: req.body.phone || "",
-
-      location: req.body.location || "",
-
-      skills: req.body.skills || "",
-
-      education: req.body.education || "",
-
-      experience: req.body.experience || "",
-
-      linkedin: req.body.linkedin || "",
-
-      github: req.body.github || "",
-
-      bio: req.body.bio || "",
-
+      name: req.body.fullName || existingUser.name || '',
+      phone: req.body.phone || '',
+      location: req.body.location || '',
+      skills: req.body.skills || '',
+      education: req.body.education || '',
+      experience: req.body.experience || '',
+      linkedin: req.body.linkedin || '',
+      github: req.body.github || '',
+      bio: req.body.bio || '',
     };
 
-    // PROFILE IMAGE
-    if (req.file) {
+    const profileImageFile = getFirstFile(req.files, 'profileImage');
+    const resumeFile = getFirstFile(req.files, 'resume');
+    let profileImageMeta = null;
+    let resumeMeta = null;
 
-      updatedData.profileImage =
-        `http://localhost:5000/uploads/${req.file.filename}`;
-
+    if (profileImageFile) {
+      profileImageMeta = await uploadToCloudinary(profileImageFile, {
+        folder: 'job-portal/profiles',
+        resourceType: 'image',
+      });
+      updatedData.profileImage = profileImageMeta.url;
     }
 
-    const updatedUser =
-      await User.findByIdAndUpdate(
-        req.userId,
-        updatedData,
-        { new: true }
-      ).select("-password");
+    if (resumeFile) {
+      resumeMeta = await uploadToCloudinary(resumeFile, {
+        folder: 'job-portal/resumes',
+        resourceType: 'raw',
+      });
+      updatedData.resume = resumeMeta.url;
+    }
 
-    res.json(updatedUser);
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      updatedData,
+      { new: true }
+    ).select('-password');
 
-  } catch (error) {
+    const profileUpdatePayload = {
+      fullName: updatedData.name,
+      phone: updatedData.phone,
+      location: updatedData.location,
+      skills: updatedData.skills,
+      education: updatedData.education,
+      experience: updatedData.experience,
+      linkedin: updatedData.linkedin,
+      github: updatedData.github,
+      bio: updatedData.bio,
+    };
 
-    console.log(error);
+    if (profileImageMeta) {
+      profileUpdatePayload.profileImage = profileImageMeta;
+    }
 
-    res.status(500).json({
-      message: error.message || "Server Error",
+    if (resumeMeta) {
+      profileUpdatePayload.resume = resumeMeta;
+    }
+
+    const updatedProfile = await SeekerProfile.findOneAndUpdate(
+      { user: req.user.id },
+      { $set: profileUpdatePayload, $setOnInsert: { user: req.user.id } },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      ...updatedUser.toObject(),
+      name: updatedProfile.fullName || updatedUser.name || '',
+      fullName: updatedProfile.fullName || updatedUser.name || '',
+      phone: updatedProfile.phone || '',
+      location: updatedProfile.location || '',
+      skills: updatedProfile.skills || '',
+      education: updatedProfile.education || '',
+      experience: updatedProfile.experience || '',
+      linkedin: updatedProfile.linkedin || '',
+      github: updatedProfile.github || '',
+      bio: updatedProfile.bio || '',
+      profileImage: updatedProfile.profileImage?.url || '',
+      profileImageMeta: updatedProfile.profileImage || null,
+      resume: updatedProfile.resume?.url || '',
+      resumeMeta: updatedProfile.resume || null,
     });
-
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: error.message || 'Server Error',
+    });
   }
-
 };
 
-
-// ============================
-// APPLY JOB
-// ============================
-
 const applyJob = async (req, res) => {
-
   try {
+    const resumeFile = req.file || getFirstFile(req.files, 'resume');
+    let resumeUrl = '';
+    let job = null;
 
-    const { coverLetter } = req.body;
+    if (req.body.jobId) {
+      if (!mongoose.Types.ObjectId.isValid(req.body.jobId)) {
+        return res.status(400).json({ message: 'Invalid job ID' });
+      }
 
-const jobId = req.params.jobId;
+      job = await Job.findOne(getPublicJobVisibilityFilter(req.body.jobId));
 
-    // CHECK JOB
-    const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({ message: 'Active approved job not found' });
+      }
 
-    if (!job) {
-      return res.status(404).json({
-        message: "Job not found",
+      const existingApplication = await JobApplication.findOne({
+        seeker: req.user.id,
+        job: job._id,
       });
+
+      if (existingApplication) {
+        return res.status(400).json({ message: 'You have already applied to this job' });
+      }
     }
 
-    // CHECK ALREADY APPLIED
-    const alreadyApplied =
-      await JobApplication.findOne({
-        seeker: req.userId,
-        job: jobId,
+    if (resumeFile) {
+      const resumeMeta = await uploadToCloudinary(resumeFile, {
+        folder: 'job-portal/applications',
+        resourceType: 'raw',
       });
-
-    if (alreadyApplied) {
-      return res.status(400).json({
-        message: "You already applied for this job",
-      });
+      resumeUrl = resumeMeta?.url || '';
     }
 
-    // CREATE APPLICATION
-    const application =
-      new JobApplication({
-
-        seeker: req.userId,
-
-        job: jobId,
-
-        coverLetter,
-
-        resume: req.file
-        ? `uploads/${req.file.filename}`
-        : "",
-
-      });
+    const application = new JobApplication({
+      seeker: req.user.id,
+      job: job?._id || null,
+      jobTitle: job?.title || req.body.jobTitle,
+      coverLetter: req.body.coverLetter,
+      resume: resumeUrl,
+    });
 
     await application.save();
 
+    if (job) {
+      await initializeApplicationStage(application);
+    }
+
+    if (job) {
+      job.applications.addToSet(application._id);
+      await job.save();
+      await syncEmployerJobStats(job.company);
+
+      // ========== 🎯 REMINDER INTEGRATION ==========
+      // Create reminder for employer - notify about new application
+      const employer = await User.findById(job.company).select('name email');
+      const seeker = await User.findById(req.user.id).select('name email');
+
+      if (employer) {
+        await createNewApplicationReminder(job.company, {
+          applicationId: application._id,
+          jobId: job._id,
+          employerName: employer.name,
+          jobTitle: job.title,
+          applicantName: seeker.name,
+          applicantEmail: seeker.email,
+        });
+
+        console.log(
+          `📧 New application reminder queued for employer: ${employer.name}`
+        );
+      }
+      // ===============================================
+    }
+
     res.status(201).json({
-      message:
-        "Application submitted successfully",
+      message: 'Application submitted successfully',
       application,
     });
-
   } catch (error) {
-
     console.log(error);
-
     res.status(500).json({
-      message: "Server Error",
+      message: 'Server Error',
     });
-
   }
-
 };
 
-
-// ============================
-// MY APPLICATIONS
-// ============================
-
 const getMyApplications = async (req, res) => {
-
   try {
-
-    const applications =
-      await JobApplication.find({
-        seeker: req.userId,
-      })
-      .populate("job")
+    const applications = await JobApplication.find({
+      seeker: req.user.id,
+    })
+      .populate('job', 'title company location status isApproved')
       .sort({ createdAt: -1 });
 
     res.json(applications);
-
   } catch (error) {
-
     console.log(error);
-
     res.status(500).json({
-      message: "Server Error",
+      message: 'Server Error',
     });
-
   }
-
 };
 
-
 module.exports = {
-
   getMyProfile,
-
   updateMyProfile,
-
   applyJob,
-
   getMyApplications,
-
 };

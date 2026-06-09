@@ -1,57 +1,48 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const JobApplicationSchema = new mongoose.Schema(
   {
-
     seeker: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+      ref: 'User',
     },
 
     job: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Job",
-      required: true,
+      ref: 'Job',
+      default: null,
     },
 
-    coverLetter: {
-      type: String,
-    },
+    jobTitle: String,
 
-    resume: {
-      type: String,
-    },
+    coverLetter: String,
+
+    resume: String,
 
     status: {
-  type: String,
-  enum: [
-    "Pending",
-    "Reviewing",
-    "Shortlisted",
-    "Interview Scheduled",
-    "Accepted",
-    "Rejected"
-  ],
-  default: "Pending",
-},
+      type: String,
+      default: 'Pending',
+    },
 
-interviewDate: {
-  type: String,
-},
+    interviewDate: {
+      type: String,
+      default: '',
+    },
 
-interviewTime: {
-  type: String,
-},
+    interviewTime: {
+      type: String,
+      default: '',
+    },
 
-interviewMode: {
-  type: String,
-},
+    interviewMode: {
+      type: String,
+      default: '',
+    },
 
-employerMessage: {
-  type: String,
-},
-
+    employerMessage: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,
@@ -59,6 +50,6 @@ employerMessage: {
 );
 
 module.exports = mongoose.model(
-  "JobApplication",
+  'JobApplication',
   JobApplicationSchema
 );

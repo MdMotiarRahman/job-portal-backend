@@ -35,6 +35,79 @@ const UserSchema = new mongoose.Schema(
     location: { type: String, default: '' },
     profileImage: { type: String, default: '' },
     resume: { type: String, default: '' },
+
+    // Admin Management Fields
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
+
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    bannedAt: {
+      type: Date,
+      default: null,
+    },
+
+    bannedReason: {
+      type: String,
+      default: '',
+    },
+
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
+
+    permissions: {
+      type: [String],
+      default: [],
+    },
+
+    adminNotes: {
+      type: String,
+      default: '',
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    loginAttempts: {
+      type: Number,
+      default: 0,
+    },
+
+    lockUntil: {
+      type: Date,
+      default: null,
+    },
+
+    pushSubscriptions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
   },
   { timestamps: true }
 );

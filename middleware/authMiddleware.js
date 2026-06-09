@@ -1,146 +1,93 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
+const authenticate = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-// ============================
-// VERIFY TOKEN
-// ============================
-
-exports.verifyToken = async (req, res, next) => {
-
-  try {
-
-    const token =
-      req.headers["x-access-token"] ||
-      req.headers.authorization;
-
-    if (!token) {
-      return res.status(401).json({
-        message: "No token provided",
-      });
-    }
-
-    // REMOVE Bearer
-    const actualToken = token.replace(
-      "Bearer ",
-      ""
-    );
-
-    // VERIFY
-    const decoded = jwt.verify(
-      actualToken,
-      process.env.JWT_SECRET
-    );
-
-    // SAVE USER DATA
-    req.userId = decoded.id;
-    req.role = decoded.role;
-
-    next();
-
-  } catch (error) {
-
-    return res.status(401).json({
-      message: "Token is invalid or expired",
-    });
-
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Not authorized' });
   }
 
-};
-
-
-// ============================
-// ADMIN
-// ============================
-
-exports.isAdmin = async (req, res, next) => {
+  const token = authHeader.split(' ')[1];
 
   try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded.user;
 
-    if (req.role !== "admin") {
-      return res.status(403).json({
-        message: "Admin access only",
-      });
-    }
-
-    next();
-
-  } catch (error) {
-
-    res.status(500).json({
-      message: error.message,
-    });
-
-  }
-
-};
-
-
-// ============================
-// EMPLOYER
-// ============================
-
-exports.isEmployer = async (req, res, next) => {
-
-  try {
-
-    const user = await User.findById(req.userId);
-
+    // Check if user is banned
+    const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    if (user.role !== "employer") {
-      return res.status(403).json({
-        message: "Employer access only",
-      });
+    if (user.isBanned) {
+      return res
+        .status(403)
+        .json({ message: 'Your account has been banned', banReason: user.bannedReason });
     }
+
+    if (!user.isActive && user.role !== 'admin') {
+      return res
+        .status(403)
+        .json({ message: 'Your account is currently inactive' });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    user.loginAttempts = 0;
+    await user.save();
 
     next();
-
-  } catch (error) {
-
-    res.status(500).json({
-      message: error.message,
-    });
-
+  } catch (err) {
+    console.error(err);
+    return res.status(401).json({ message: 'Token is invalid or expired' });
   }
-
 };
 
-
-// ============================
-// SEEKER
-// ============================
-
-exports.isSeeker = async (req, res, next) => {
-
-  try {
-
-    const user = await User.findById(req.userId);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ message: 'Not authorized' });
     }
 
-    if (user.role !== "seeker") {
-      return res.status(403).json({
-        message: "Seeker access only",
-      });
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Insufficient permissions' });
     }
 
-    next();
+    return next();
+  };
+};
 
-  } catch (error) {
+const checkPermission = (requiredPermissions) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
 
-    res.status(500).json({
-      message: error.message,
-    });
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
 
-  }
+      const hasPermission = requiredPermissions.every((perm) =>
+        user.permissions.includes(perm)
+      );
 
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+
+      next();
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  };
+};
+
+module.exports = {
+  authenticate,
+  requireRole,
+  checkPermission,
 };
