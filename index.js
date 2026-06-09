@@ -59,6 +59,7 @@ app.use('/api/interviews', require('./routes/interviews'));
 app.use('/api/offers', require('./routes/offers'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/recommendations', require('./routes/recommendations'));
 
 // Multer / server error handler
 app.use((err, req, res, next) => {
