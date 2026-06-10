@@ -32,7 +32,26 @@ const removeLocalFile = (filePath) => {
 const uploadToCloudinary = async (file, options = {}) => {
   if (!file) return null;
 
+  const hasCloudinaryConfig =
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET;
+
+  // Local development fallback
+  // If Cloudinary is not configured, keep file inside backend/uploads
+  if (!hasCloudinaryConfig) {
+    return {
+      url: `/uploads/${file.filename}`,
+      publicId: '',
+      resourceType: options.resourceType || 'raw',
+      format: file.mimetype || '',
+      bytes: file.size || 0,
+      uploadedAt: new Date(),
+    };
+  }
+
   const cloudinary = getCloudinaryClient();
+
   const uploadOptions = {
     folder: options.folder,
     resource_type: options.resourceType || 'image',
@@ -40,6 +59,7 @@ const uploadToCloudinary = async (file, options = {}) => {
 
   try {
     const result = await cloudinary.uploader.upload(file.path, uploadOptions);
+
     return {
       url: result.secure_url || '',
       publicId: result.public_id || '',
