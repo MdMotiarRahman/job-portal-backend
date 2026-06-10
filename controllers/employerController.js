@@ -1,10 +1,93 @@
 const mongoose = require('mongoose');
+const fs = require('fs');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
 const JobApplication = require('../models/JobApplication');
 const ApplicationStage = require('../models/ApplicationStage');
 const User = require('../models/User');
 const { createJobExpiringReminder } = require('../utils/reminderService');
+
+let cloudinaryClient = null;
+
+const configureCloudinary = () => {
+  try {
+    const cloudinary = require('cloudinary').v2;
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    return cloudinary;
+  } catch (error) {
+    return null;
+  }
+};
+
+const getCloudinaryClient = () => {
+  if (!cloudinaryClient) {
+    cloudinaryClient = configureCloudinary();
+  }
+  return cloudinaryClient;
+};
+
+const removeLocalFile = (filePath) => {
+  if (!filePath) return;
+  try { fs.unlinkSync(filePath); } catch (error) { /* ignore */ }
+};
+
+const uploadToCloudinary = async (file, options = {}) => {
+  if (!file) return null;
+
+  const hasCloudinaryConfig =
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET;
+
+  if (!hasCloudinaryConfig) {
+    return {
+      url: `/uploads/${file.filename}`,
+      publicId: '',
+      resourceType: options.resourceType || 'image',
+      format: file.mimetype || '',
+      bytes: file.size || 0,
+      uploadedAt: new Date(),
+    };
+  }
+
+  const cloudinary = getCloudinaryClient();
+  if (!cloudinary) {
+    return {
+      url: `/uploads/${file.filename}`,
+      publicId: '',
+      resourceType: options.resourceType || 'image',
+      format: file.mimetype || '',
+      bytes: file.size || 0,
+      uploadedAt: new Date(),
+    };
+  }
+
+  try {
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: options.folder || 'job-portal/logos',
+      resource_type: options.resourceType || 'image',
+    });
+    return {
+      url: result.secure_url || '',
+      publicId: result.public_id || '',
+      resourceType: result.resource_type || '',
+      format: result.format || '',
+      bytes: result.bytes || 0,
+      uploadedAt: new Date(),
+    };
+  } finally {
+    removeLocalFile(file.path);
+  }
+};
+
+const getFirstFile = (files, fieldName) => {
+  if (!files || !files[fieldName] || !files[fieldName].length) return null;
+  return files[fieldName][0];
+};
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 const experienceLevels = ['Entry', 'Mid', 'Senior'];
@@ -463,6 +546,81 @@ exports.updateApplication = async (req, res) => {
     res.json({
       message: 'Application updated successfully.',
       application: updatedApplication,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/* ============================================
+   EMPLOYER PROFILE
+   ============================================ */
+
+exports.getEmployerProfile = async (req, res) => {
+  try {
+    const profile = await ensureEmployerProfile(
+      await User.findById(req.user.id)
+    );
+
+    const user = await User.findById(req.user.id).select('name email');
+
+    res.json({
+      profile: {
+        ...profile.toObject(),
+        userName: user?.name || '',
+        userEmail: user?.email || '',
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.updateEmployerProfile = async (req, res) => {
+  try {
+    const allowedFields = [
+      'companyName',
+      'companyWebsite',
+      'companyDescription',
+      'companySize',
+      'industry',
+      'location',
+      'phone',
+    ];
+
+    const updates = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    const logoFile = getFirstFile(req.files, 'companyLogo');
+    if (logoFile) {
+      const logoMeta = await uploadToCloudinary(logoFile, {
+        folder: 'job-portal/logos',
+        resourceType: 'image',
+      });
+      if (logoMeta) {
+        updates.logo = logoMeta;
+      }
+    }
+
+    const profile = await EmployerProfile.findOneAndUpdate(
+      { user: req.user.id },
+      { $set: updates },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    if (req.body.companyName) {
+      await User.findByIdAndUpdate(req.user.id, { name: req.body.companyName });
+    }
+
+    res.json({
+      message: 'Profile updated successfully.',
+      profile,
     });
   } catch (error) {
     console.error(error);

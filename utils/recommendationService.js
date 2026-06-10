@@ -18,10 +18,11 @@ const experienceToLevel = (text) => {
   if (!text) return null;
   const t = text.toLowerCase();
   if (t.includes('senior') || t.includes('lead') || t.includes('principal') || t.includes('architect')) return 'Senior';
-  if (t.includes('mid') || t.includes('intermediate') || t.includes('2+ year') || t.includes('3+ year') || t.includes('4+ year') || t.includes('5+ year')) return 'Mid';
-  if (t.includes('entry') || t.includes('junior') || t.includes('fresher') || t.includes('0+') || t.includes('1+ year')) return 'Entry';
-  const years = parseInt(t);
-  if (!isNaN(years)) {
+  if (t.includes('mid') || t.includes('intermediate')) return 'Mid';
+  if (t.includes('entry') || t.includes('junior') || t.includes('fresher')) return 'Entry';
+  const yearsMatch = t.match(/(\d+)/);
+  if (yearsMatch) {
+    const years = parseInt(yearsMatch[1]);
     if (years >= 5) return 'Senior';
     if (years >= 2) return 'Mid';
     return 'Entry';
@@ -42,6 +43,10 @@ const educationLevel = (text) => {
   if (t.includes('bachelor') || t.includes('b.s') || t.includes('b.a') || t.includes('btech') || t.includes('b.eng') || t.includes('b.e') || t.includes('degree')) return 3;
   if (t.includes('diploma') || t.includes('associate')) return 2;
   if (t.includes('high school') || t.includes('secondary')) return 1;
+  if (t === "bachelor's" || t === "master's" || t === "bachelor's degree" || t === "master's degree") {
+    if (t.includes('master')) return 4;
+    return 3;
+  }
   return 2;
 };
 
@@ -115,8 +120,7 @@ const getJobRecommendations = async (seekerId, limit = 10) => {
 
   const jobs = await Job.find({
     status: 'active',
-    isApproved: true,
-    expiryDate: { $gt: new Date() },
+    isApproved: { $ne: false },
   }).populate('company', 'name');
 
   const scored = jobs

@@ -1,14 +1,17 @@
 const express = require('express');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
+const upload = require('../middleware/upload');
 const {
   closeJob,
   createJob,
   deleteJob,
   getApplications,
+  getEmployerProfile,
   getEmployerSummary,
   getMyJobs,
   reopenJob,
   updateApplication,
+  updateEmployerProfile,
   updateJob,
 } = require('../controllers/employerController');
 
@@ -18,6 +21,9 @@ router.use(authenticate);
 router.use(requireRole('employer'));
 
 router.get('/summary', getEmployerSummary);
+
+router.get('/profile', getEmployerProfile);
+router.put('/profile', upload.fields([{ name: 'companyLogo', maxCount: 1 }]), updateEmployerProfile);
 
 router.get('/jobs', getMyJobs);
 router.post('/jobs', createJob);
