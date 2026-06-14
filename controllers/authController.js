@@ -4,6 +4,7 @@ const User = require('../models/User');
 const SeekerProfile = require('../models/SeekerProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const { createEmployerVerificationReminder } = require('../utils/reminderService');
+const { uploadToCloudinary } = require('../utils/cloudinaryFiles');
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -206,6 +207,7 @@ exports.me = async (req, res) => {
         lastLogin: user.lastLogin,
         phone: user.phone,
         location: user.location,
+        profileImage: user.profileImage || '',
       },
     });
   } catch (err) {
@@ -224,6 +226,20 @@ exports.updateMe = async (req, res) => {
     if (name) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (location !== undefined) user.location = location;
+
+    // Handle profile image upload
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file, {
+          folder: 'jobportal/admin/profile',
+          transformation: [{ width: 300, height: 300, crop: 'fill' }],
+        });
+        user.profileImage = result.secure_url || result.url;
+      } catch (uploadErr) {
+        console.error('Cloudinary upload failed, using local fallback:', uploadErr.message);
+        user.profileImage = `/uploads/${req.file.filename}`;
+      }
+    }
 
     if (newPassword && currentPassword) {
       const isMatch = await bcrypt.compare(currentPassword, user.password);
@@ -244,6 +260,7 @@ exports.updateMe = async (req, res) => {
         role: user.role,
         phone: user.phone,
         location: user.location,
+        profileImage: user.profileImage || '',
       }
     });
   } catch (err) {
