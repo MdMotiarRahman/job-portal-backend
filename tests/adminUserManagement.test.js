@@ -21,6 +21,7 @@ const makeTokenForUser = (user) => {
     { user: { id: user._id, role: user.role }, role: user.role },
     process.env.JWT_SECRET || 'test-secret',
     { expiresIn: '1h' }
+    
   );
 };
 
