@@ -4,13 +4,17 @@ const EmployerProfile = require('../models/EmployerProfile');
 const JobApplication = require('../models/JobApplication');
 
 const buildPublicJobFilter = (query) => {
-  const { search, location, jobType, experienceLevel } = query;
+  const { search, location, jobType, experienceLevel, company } = query;
   const filter = {
     status: 'active',
     // Treat legacy active jobs without an approval flag as public,
     // but keep explicitly pending/rejected jobs hidden.
     isApproved: { $ne: false },
   };
+
+  if (company) {
+    filter.company = company;
+  }
 
   if (search) {
     const searchRegex = { $regex: search.trim(), $options: 'i' };

@@ -49,6 +49,7 @@ app.get('/', (req, res) => res.send('API Running'));
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/jobs', require('./routes/jobs'));
+app.use('/api/employers', require('./routes/employers'));
 app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/seeker', require('./routes/seeker'));
 app.use('/api/employer', require('./routes/employer'));
