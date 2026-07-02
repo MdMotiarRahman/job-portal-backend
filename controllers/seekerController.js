@@ -194,7 +194,7 @@ const updateMyProfile = async (req, res) => {
 
     if (profileImageFile) {
       profileImageMeta = await uploadToCloudinary(profileImageFile, {
-        folder: 'job-portal/profiles',
+        folder: 'jobland/profiles',
         resourceType: 'image',
       });
       updatedData.profileImage = profileImageMeta.url;
@@ -202,7 +202,7 @@ const updateMyProfile = async (req, res) => {
 
     if (resumeFile) {
       resumeMeta = await uploadToCloudinary(resumeFile, {
-        folder: 'job-portal/resumes',
+        folder: 'jobland/resumes',
         resourceType: 'raw',
       });
       updatedData.resume = resumeMeta.url;
@@ -294,7 +294,7 @@ const applyJob = async (req, res) => {
 
     if (resumeFile) {
       const resumeMeta = await uploadToCloudinary(resumeFile, {
-        folder: 'job-portal/applications',
+        folder: 'jobland/applications',
         resourceType: 'raw',
       });
       resumeUrl = resumeMeta?.url || '';

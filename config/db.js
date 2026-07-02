@@ -2,14 +2,14 @@ const mongoose = require('mongoose');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load the backend-specific .env (job-portal-backend/.env)
+// Load the backend-specific .env (jobland-backend/.env)
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) {
-      throw new Error('MONGO_URI is not set. Check job-portal-backend/.env');
+      throw new Error('MONGO_URI is not set. Check jobland-backend/.env');
     }
 
     const isAtlas = mongoUri.startsWith('mongodb+srv://');

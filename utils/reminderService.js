@@ -37,7 +37,7 @@ const canUseWebPush =
 
 if (canUseWebPush) {
   webpush.setVapidDetails(
-    'mailto:support@jobportal.com',
+    'mailto:support@jobland.com',
     vapidKeys.publicKey,
     vapidKeys.privateKey
   );

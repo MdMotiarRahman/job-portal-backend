@@ -211,7 +211,7 @@ async function main() {
     // ── 7. Verification Pending ─────────────────────────────────
     {
       template: 'reminderVerificationPending',
-      to: resolveEmail(admin?.email || 'admin@jobportal.com'),
+      to: resolveEmail(admin?.email || 'admin@jobland.com'),
       data: {
         companyName: employerMap[firstEmployer._id?.toString()]?.name || 'NewTech Inc.',
         contactName: firstEmployer.name,

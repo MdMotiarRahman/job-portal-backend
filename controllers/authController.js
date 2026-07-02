@@ -231,7 +231,7 @@ exports.updateMe = async (req, res) => {
     if (req.file) {
       try {
         const result = await uploadToCloudinary(req.file, {
-          folder: 'jobportal/admin/profile',
+          folder: 'jobland/admin/profile',
           transformation: [{ width: 300, height: 300, crop: 'fill' }],
         });
         user.profileImage = result.secure_url || result.url;

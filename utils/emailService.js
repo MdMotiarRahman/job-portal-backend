@@ -21,7 +21,7 @@ const EMAIL_SUBJECTS = {
 
 const getEmailSubject = (reminderType, data) => {
   const subjectFn = EMAIL_SUBJECTS[reminderType];
-  return subjectFn ? subjectFn(data) : 'JobPortal Notification';
+  return subjectFn ? subjectFn(data) : 'JobLand Notification';
 };
 
 // ─── Send Email ───────────────────────────────────────────────────
@@ -65,7 +65,7 @@ const emailHeader = (brandColor = '#1a1a2e') => `
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${brandColor};">
   <tr>
     <td style="padding:16px 24px;">
-      <span style="font-size:16px;font-weight:700;color:#fff;letter-spacing:-0.3px;">JobPortal</span>
+      <span style="font-size:16px;font-weight:700;color:#fff;letter-spacing:-0.3px;">JobLand</span>
     </td>
   </tr>
 </table>
@@ -75,7 +75,7 @@ const emailFooter = `
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #eee;">
   <tr>
     <td style="padding:16px 24px;font-size:11px;color:#999;line-height:1.5;">
-      <p style="margin:0 0 4px 0;">This is a notification from JobPortal.</p>
+      <p style="margin:0 0 4px 0;">This is a notification from JobLand.</p>
       <p style="margin:0;">
         <a href="${PREFERENCES_URL}" style="color:#999;text-decoration:underline;">Manage email preferences</a>
       </p>
@@ -263,7 +263,7 @@ const reminderVerificationPendingTemplate = (data) => wrap(`
 const defaultTemplate = (data) => wrap(`
   <h2 style="margin:0 0 16px;font-size:17px;font-weight:600;color:#1a1a2e;">Notification</h2>
   <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
-    ${data.message || 'You have a new notification from JobPortal.'}
+    ${data.message || 'You have a new notification from JobLand.'}
   </p>
 `);
 

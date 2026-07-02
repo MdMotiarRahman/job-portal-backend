@@ -7,7 +7,7 @@ const configureCloudinary = () => {
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error(
-      'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in job-portal-backend/.env'
+      'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in jobland-backend/.env'
     );
   }
 

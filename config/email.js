@@ -15,7 +15,7 @@
  *    MAILTRAP_PORT=2525
  *    MAILTRAP_USER=your_user_id
  *    MAILTRAP_PASS=your_password
- *    EMAIL_FROM=noreply@jobportal.com
+ *    EMAIL_FROM=noreply@jobland.com
  * 
  * Option 2: GMAIL SMTP (FREE - For Production)
  * ──────────────────────────────────────────────
@@ -98,5 +98,5 @@ module.exports = {
   transporter,
   provider,
   testEmailConfig,
-  emailFrom: process.env.EMAIL_FROM || 'noreply@jobportal.com',
+  emailFrom: process.env.EMAIL_FROM || 'noreply@jobland.com',
 };

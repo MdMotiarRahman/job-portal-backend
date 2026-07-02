@@ -17,7 +17,7 @@ jest.mock('web-push', () => ({
 describe('ReminderService Tests', () => {
   beforeAll(async () => {
     // Setup test database connection
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/jobportal_test');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/jobland_test');
   });
 
   afterAll(async () => {

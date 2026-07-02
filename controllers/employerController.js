@@ -68,7 +68,7 @@ const uploadToCloudinary = async (file, options = {}) => {
 
   try {
     const result = await cloudinary.uploader.upload(file.path, {
-      folder: options.folder || 'job-portal/logos',
+      folder: options.folder || 'jobland/logos',
       resource_type: options.resourceType || 'image',
     });
     return {
@@ -600,7 +600,7 @@ exports.updateEmployerProfile = async (req, res) => {
     const logoFile = getFirstFile(req.files, 'companyLogo');
     if (logoFile) {
       const logoMeta = await uploadToCloudinary(logoFile, {
-        folder: 'job-portal/logos',
+        folder: 'jobland/logos',
         resourceType: 'image',
       });
       if (logoMeta) {

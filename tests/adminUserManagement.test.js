@@ -34,7 +34,7 @@ describe('Admin User Management', () => {
   beforeAll(async () => {
     // Ensure mongoose is connected for CRUD tests
     if (mongoose.connection.readyState === 0) {
-      const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/jobportal_test';
+      const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/jobland_test';
       await mongoose.connect(uri);
     }
 

@@ -1,7 +1,7 @@
-# Job Portal Backend
+# JobLand Backend
 
 ## 1. Overview
-This repository contains the backend service for a role-based Job Portal platform. It exposes REST APIs for authentication, seeker workflows, and administrative operations.
+This repository contains the backend service for a role-based JobLand platform. It exposes REST APIs for authentication, seeker workflows, and administrative operations.
 
 ## 2. Technology Stack
 - Node.js

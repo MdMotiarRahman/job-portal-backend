@@ -3,9 +3,9 @@ const User = require('../models/User');
 const connectDB = require('../config/db');
 
 const roles = [
-  { role: 'admin', name: 'Admin User', email: 'admin@jobportal.local', password: 'Admin@12345' },
-  { role: 'employer', name: 'Employer User', email: 'employer@jobportal.local', password: 'Employer@12345' },
-  { role: 'seeker', name: 'Seeker User', email: 'seeker@jobportal.local', password: 'Seeker@12345' },
+  { role: 'admin', name: 'Admin User', email: 'admin@jobland.local', password: 'Admin@12345' },
+  { role: 'employer', name: 'Employer User', email: 'employer@jobland.local', password: 'Employer@12345' },
+  { role: 'seeker', name: 'Seeker User', email: 'seeker@jobland.local', password: 'Seeker@12345' },
 ];
 
 async function run() {

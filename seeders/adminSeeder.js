@@ -6,7 +6,7 @@ const connectDB = require('../config/db');
 // Admin credentials - CHANGE THESE!
 const ADMIN_DATA = {
   name: 'Admin User',
-  email: 'admin@jobportal.com',
+  email: 'admin@jobland.com',
   password: 'AdminPassword@123',
   role: 'admin',
   phone: '+1-555-0000',
